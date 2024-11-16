@@ -1,0 +1,6 @@
+@FactoryManager.API_HostAddress = http://localhost:5197
+
+GET {{FactoryManager.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
