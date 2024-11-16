@@ -1,0 +1,139 @@
+﻿<UserControl x:Class="FactoryManager.Desktop.Views.PlanningView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d" 
+             d:DesignHeight="700" d:DesignWidth="1000">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Nagłówek -->
+        <TextBlock Text="Planowanie" 
+                   FontSize="24" 
+                   Margin="20,20,20,10"/>
+
+        <!-- Panel narzędziowy -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="20,0,20,10">
+            <Button Content="Nowy Plan" Width="120" Height="30" Margin="0,0,10,0"/>
+            <Button Content="Harmonogram" Width="120" Height="30" Margin="0,0,10,0"/>
+            <Button Content="Optymalizacja" Width="120" Height="30"/>
+        </StackPanel>
+
+        <!-- Główna zawartość -->
+        <TabControl Grid.Row="2" Margin="20">
+            <TabItem Header="Harmonogram">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Filtry -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <DatePicker Width="120" Margin="0,0,10,0"/>
+                        <ComboBox Width="150" Margin="0,0,10,0">
+                            <ComboBoxItem Content="Wszystkie linie"/>
+                            <ComboBoxItem Content="Linia 1"/>
+                            <ComboBoxItem Content="Linia 2"/>
+                        </ComboBox>
+                        <Button Content="Filtruj" Width="80"/>
+                    </StackPanel>
+
+                    <!-- Harmonogram -->
+                    <DataGrid Grid.Row="1" AutoGenerateColumns="False" 
+                              ItemsSource="{Binding ScheduledTasks}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Zadanie" Binding="{Binding TaskName}"/>
+                            <DataGridTextColumn Header="Linia" Binding="{Binding Line}"/>
+                            <DataGridTextColumn Header="Start" Binding="{Binding StartTime}"/>
+                            <DataGridTextColumn Header="Koniec" Binding="{Binding EndTime}"/>
+                            <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Zasoby">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="250"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Lista zasobów -->
+                    <ListBox ItemsSource="{Binding Resources}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding Status}" FontSize="11"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- Szczegóły zasobu -->
+                    <Grid Grid.Column="1" Margin="10,0,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Informacje o zasobie -->
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedResource.Name}" FontSize="18"/>
+                            <TextBlock Text="{Binding SelectedResource.Description}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,10">
+                                <TextBlock Text="Status: "/>
+                                <TextBlock Text="{Binding SelectedResource.Status}" Margin="5,0"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Harmonogram zasobu -->
+                        <DataGrid Grid.Row="1" Margin="0,10,0,0"
+                                  ItemsSource="{Binding ResourceSchedule}"
+                                  AutoGenerateColumns="False">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Zadanie" Binding="{Binding TaskName}"/>
+                                <DataGridTextColumn Header="Start" Binding="{Binding StartTime}"/>
+                                <DataGridTextColumn Header="Koniec" Binding="{Binding EndTime}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Prognozy">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Parametry prognozy -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <ComboBox Width="150" Margin="0,0,10,0">
+                            <ComboBoxItem Content="Tydzień"/>
+                            <ComboBoxItem Content="Miesiąc"/>
+                            <ComboBoxItem Content="Kwartał"/>
+                        </ComboBox>
+                        <Button Content="Generuj" Width="80"/>
+                    </StackPanel>
+
+                    <!-- Wykres prognozy -->
+                    <Border Grid.Row="1" Background="#FF2D2D30">
+                        <!-- Tu będzie wykres -->
+                        <TextBlock Text="Wykres prognozy" 
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</UserControl>
