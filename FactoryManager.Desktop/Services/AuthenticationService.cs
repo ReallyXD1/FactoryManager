@@ -2,112 +2,60 @@
 using System.Configuration;
 using System.Net.Http;
 using System.Threading.Tasks;
+using FactoryManager.Desktop.Models;
+using FactoryManager.Desktop.Services.Interfaces;
 
 namespace FactoryManager.Desktop.Services
 {
     public class AuthenticationService : IAuthenticationService
     {
-        private string _currentToken;
-        private readonly IHttpClient _httpClient;
-        private readonly IConfiguration _configuration;
+        private readonly HttpClient _httpClient;
+        private readonly string _baseUrl;
+        private User _currentUser;
 
-        public AuthenticationService(IHttpClient httpClient, IConfiguration configuration)
+        public AuthenticationService(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
-            _configuration = configuration;
+            _baseUrl = configuration.GetValue<string>("ApiBaseUrl");
         }
+
+        public bool IsAuthenticated => _currentUser != null;
 
         public async Task<bool> LoginAsync(string username, string password)
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{_configuration["ApiUrl"]}/auth/login",
-                    new { username, password });
+                var request = new { Username = username, Password = password };
+                var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/auth/login", request);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    _currentToken = await response.Content.ReadAsStringAsync();
+                    _currentUser = await response.Content.ReadFromJsonAsync<User>();
+                    var token = response.Headers.GetValues("Authorization").FirstOrDefault();
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        _httpClient.DefaultRequestHeaders.Authorization =
+                            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                    }
                     return true;
                 }
                 return false;
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Login error: {ex.Message}");
-                return false;
-            }
-        }
-
-        public async Task<bool> LogoutAsync()
-        {
-            _currentToken = null;
-            return true;
-        }
-
-        public async Task<bool> ChangePasswordAsync(string oldPassword, string newPassword)
-        {
-            try
-            {
-                var response = await _httpClient.PostAsync($"{_configuration["ApiUrl"]}/auth/change-password",
-                    new { oldPassword, newPassword });
-
-                return response.IsSuccessStatusCode;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Change password error: {ex.Message}");
-                return false;
-            }
-        }
-
-        public async Task<bool> ValidateTokenAsync()
-        {
-            if (string.IsNullOrEmpty(_currentToken))
-                return false;
-
-            try
-            {
-                var response = await _httpClient.GetAsync($"{_configuration["ApiUrl"]}/auth/validate");
-                return response.IsSuccessStatusCode;
-            }
-            catch
+            catch (Exception)
             {
                 return false;
             }
         }
 
-        public async Task<string> GetUserRoleAsync()
+        public void Logout()
         {
-            try
-            {
-                var response = await _httpClient.GetAsync($"{_configuration["ApiUrl"]}/auth/role");
-                if (response.IsSuccessStatusCode)
-                {
-                    return await response.Content.ReadAsStringAsync();
-                }
-                return null;
-            }
-            catch
-            {
-                return null;
-            }
+            _currentUser = null;
+            _httpClient.DefaultRequestHeaders.Authorization = null;
         }
 
-        public async Task<string> GetUserNameAsync()
+        public User GetCurrentUser()
         {
-            try
-            {
-                var response = await _httpClient.GetAsync($"{_configuration["ApiUrl"]}/auth/username");
-                if (response.IsSuccessStatusCode)
-                {
-                    return await response.Content.ReadAsStringAsync();
-                }
-                return null;
-            }
-            catch
-            {
-                return null;
-            }
+            return _currentUser;
         }
     }
 }

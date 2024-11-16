@@ -1,60 +1,86 @@
-﻿using FactoryManager.Desktop.ViewModels;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Net.Http;
 using System.Threading.Tasks;
+using FactoryManager.Desktop.Models;
+using FactoryManager.Desktop.Services.Interfaces;
 
 namespace FactoryManager.Desktop.Services
 {
     public class ReportService : IReportService
     {
-        private readonly IHttpClient _httpClient;
-        private readonly IConfiguration _configuration;
+        private readonly HttpClient _httpClient;
+        private readonly string _baseUrl;
 
-        public ReportService(IHttpClient httpClient, IConfiguration configuration)
+        public ReportService(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
-            _configuration = configuration;
+            _baseUrl = configuration.GetValue<string>("ApiBaseUrl");
         }
 
-        public async Task<Report> GenerateReportAsync(string reportType, DateTime startDate, DateTime endDate)
+        public async Task<IEnumerable<ReportType>> GetReportTypesAsync()
         {
-            try
-            {
-                var response = await _httpClient.PostAsync(
-                    $"{_configuration["ApiUrl"]}/reports/generate",
-                    new { reportType, startDate, endDate });
-
-                if (response.IsSuccessStatusCode)
-                {
-                    return await response.Content.ReadAsAsync<Report>();
-                }
-                return null;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Generate report error: {ex.Message}");
-                return null;
-            }
+            var response = await _httpClient.GetAsync($"{_baseUrl}/reports/types");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<IEnumerable<ReportType>>();
         }
 
-        public async Task<bool> ExportReportAsync(int reportId)
+        public async Task<IEnumerable<Report>> GetReportsAsync()
         {
-            try
-            {
-                var response = await _httpClient.GetAsync(
-                    $"{_configuration["ApiUrl"]}/reports/{reportId}/export");
-
-                return response.IsSuccessStatusCode;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Export report error: {ex.Message}");
-                return false;
-            }
+            var response = await _httpClient.GetAsync($"{_baseUrl}/reports");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<IEnumerable<Report>>();
         }
 
-        // Implementacja pozostałych metod interfejsu...
+        public async Task<Report> GenerateReportAsync(int reportTypeId, DateTime startDate, DateTime endDate)
+        {
+            var request = new
+            {
+                ReportTypeId = reportTypeId,
+                StartDate = startDate,
+                EndDate = endDate
+            };
+
+            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/reports/generate", request);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<Report>();
+        }
+
+        public async Task ScheduleReportAsync(ReportSchedule schedule)
+        {
+            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/reports/schedule", schedule);
+            response.EnsureSuccessStatusCode();
+        }
+
+        public async Task ExportReportAsync(int reportId, string path)
+        {
+            var response = await _httpClient.GetAsync($"{_baseUrl}/reports/{reportId}/export");
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsByteArrayAsync();
+            await File.WriteAllBytesAsync(path, content);
+        }
+
+        public async Task ShareReportAsync(int reportId, IEnumerable<string> recipients)
+        {
+            var request = new { Recipients = recipients };
+            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/reports/{reportId}/share", request);
+            response.EnsureSuccessStatusCode();
+        }
+
+        public async Task<ReportPreview> GetReportPreviewAsync(int reportTypeId, DateTime startDate, DateTime endDate)
+        {
+            var request = new
+            {
+                ReportTypeId = reportTypeId,
+                StartDate = startDate,
+                EndDate = endDate
+            };
+
+            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/reports/preview", request);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ReportPreview>();
+        }
     }
 }

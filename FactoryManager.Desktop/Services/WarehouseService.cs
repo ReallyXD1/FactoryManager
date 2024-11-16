@@ -1,59 +1,71 @@
-﻿using FactoryManager.Desktop.ViewModels;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Net.Http;
 using System.Threading.Tasks;
+using FactoryManager.Desktop.Models;
+using FactoryManager.Desktop.Services.Interfaces;
 
 namespace FactoryManager.Desktop.Services
 {
     public class WarehouseService : IWarehouseService
     {
-        private readonly IHttpClient _httpClient;
-        private readonly IConfiguration _configuration;
+        private readonly HttpClient _httpClient;
+        private readonly string _baseUrl;
 
-        public WarehouseService(IHttpClient httpClient, IConfiguration configuration)
+        public WarehouseService(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
-            _configuration = configuration;
+            _baseUrl = configuration.GetValue<string>("ApiBaseUrl");
         }
 
         public async Task<IEnumerable<WarehouseItem>> GetWarehouseItemsAsync()
         {
-            try
-            {
-                var response = await _httpClient.GetAsync($"{_configuration["ApiUrl"]}/warehouse/items");
-                if (response.IsSuccessStatusCode)
-                {
-                    return await response.Content.ReadAsAsync<IEnumerable<WarehouseItem>>();
-                }
-                return new List<WarehouseItem>();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Get warehouse items error: {ex.Message}");
-                return new List<WarehouseItem>();
-            }
+            var response = await _httpClient.GetAsync($"{_baseUrl}/warehouse/items");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<IEnumerable<WarehouseItem>>();
+        }
+
+        public async Task<IEnumerable<Category>> GetCategoriesAsync()
+        {
+            var response = await _httpClient.GetAsync($"{_baseUrl}/warehouse/categories");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<IEnumerable<Category>>();
         }
 
         public async Task<IEnumerable<Location>> GetLocationsAsync()
         {
-            try
-            {
-                var response = await _httpClient.GetAsync($"{_configuration["ApiUrl"]}/warehouse/locations");
-                if (response.IsSuccessStatusCode)
-                {
-                    return await response.Content.ReadAsAsync<IEnumerable<Location>>();
-                }
-                return new List<Location>();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Get locations error: {ex.Message}");
-                return new List<Location>();
-            }
+            var response = await _httpClient.GetAsync($"{_baseUrl}/warehouse/locations");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<IEnumerable<Location>>();
         }
 
-        // Implementacja pozostałych metod interfejsu...
+        public async Task<WarehouseTransaction> ReceiveItemsAsync(WarehouseTransaction transaction)
+        {
+            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/warehouse/transactions/receive", transaction);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<WarehouseTransaction>();
+        }
+
+        public async Task<WarehouseTransaction> IssueItemsAsync(WarehouseTransaction transaction)
+        {
+            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/warehouse/transactions/issue", transaction);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<WarehouseTransaction>();
+        }
+
+        public async Task<WarehouseTransaction> MoveItemsAsync(WarehouseTransaction transaction)
+        {
+            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/warehouse/transactions/move", transaction);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<WarehouseTransaction>();
+        }
+
+        public async Task<WarehouseStatistics> GetWarehouseStatisticsAsync()
+        {
+            var response = await _httpClient.GetAsync($"{_baseUrl}/warehouse/statistics");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<WarehouseStatistics>();
+        }
     }
 }
