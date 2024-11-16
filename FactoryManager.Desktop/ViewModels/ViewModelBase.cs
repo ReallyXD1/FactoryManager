@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace FactoryManager.Desktop.ViewModels
 {
-    public class ViewModelBase : INotifyPropertyChanged
+    public abstract class ViewModelBase : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -18,6 +18,11 @@ namespace FactoryManager.Desktop.ViewModels
             field = value;
             OnPropertyChanged(propertyName);
             return true;
+        }
+
+        protected virtual void RaisePropertyChanged(string propertyName)
+        {
+            OnPropertyChanged(propertyName);
         }
     }
 }
