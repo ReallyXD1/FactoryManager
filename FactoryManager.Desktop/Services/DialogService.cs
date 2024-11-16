@@ -1,6 +1,5 @@
 ﻿using System.Threading.Tasks;
 using System.Windows;
-using FactoryManager.Desktop.Models;
 using FactoryManager.Desktop.Services.Interfaces;
 using Microsoft.Win32;
 
@@ -8,54 +7,110 @@ namespace FactoryManager.Desktop.Services
 {
     public class DialogService : IDialogService
     {
-        private readonly Window _mainWindow;
-
-        public DialogService(Window mainWindow)
+        public Task<bool?> ShowDialogAsync(Window dialog)
         {
-            _mainWindow = mainWindow;
+            return Task.FromResult(dialog.ShowDialog());
         }
 
-        public async Task<bool?> ShowDialogAsync(object dialog)
+        public Task ShowErrorAsync(string title, string message)
         {
-            if (dialog is Window window)
+            return Task.Run(() =>
             {
-                window.Owner = _mainWindow;
-                return await Task.FromResult(window.ShowDialog());
-            }
-            return null;
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Error);
+                });
+            });
         }
 
-        public async Task ShowErrorAsync(string title, string message)
+        public Task ShowInfoAsync(string title, string message)
         {
-            await Task.FromResult(MessageBox.Show(
-                _mainWindow,
-                message,
-                title,
-                MessageBoxButton.OK,
-                MessageBoxImage.Error));
-        }
-
-        public async Task ShowReportAsync(Report report)
-        {
-            var window = new ReportViewerWindow
+            return Task.Run(() =>
             {
-                Owner = _mainWindow,
-                DataContext = new ReportViewerViewModel(report)
-            };
-
-            await Task.FromResult(window.ShowDialog());
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Information);
+                });
+            });
         }
 
-        public async Task<string> ShowSaveFileDialogAsync(string title, string filter)
+        public Task<bool> ShowConfirmationAsync(string title, string message)
         {
-            var dialog = new SaveFileDialog
+            return Task.Run(() =>
             {
-                Title = title,
-                Filter = filter,
-                FilterIndex = 1
-            };
+                return Application.Current.Dispatcher.Invoke(() =>
+                {
+                    var result = MessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    return result == MessageBoxResult.Yes;
+                });
+            });
+        }
 
-            return await Task.FromResult(dialog.ShowDialog(_mainWindow) == true ? dialog.FileName : null);
+        public Task<string> ShowInputAsync(string title, string message, string defaultValue = "")
+        {
+            return Task.Run(() =>
+            {
+                return Application.Current.Dispatcher.Invoke(() =>
+                {
+                    var dialog = new InputDialog(title, message, defaultValue);
+                    var result = dialog.ShowDialog();
+                    return result == true ? dialog.InputText : null;
+                });
+            });
+        }
+
+        public async Task ShowProgressAsync(string title, string message, Task task)
+        {
+            var progressDialog = new ProgressDialog(title, message);
+            var progressTask = Task.Run(() =>
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    progressDialog.Show();
+                });
+            });
+
+            await task;
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                progressDialog.Close();
+            });
+        }
+
+        public void ShowNotification(string message, string type = "Info")
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                var notification = new NotificationWindow(message, type);
+                notification.Show();
+            });
+        }
+
+        public Task<string> ShowFileDialogAsync(string filter, bool isSaveDialog = false)
+        {
+            return Task.Run(() =>
+            {
+                return Application.Current.Dispatcher.Invoke(() =>
+                {
+                    if (isSaveDialog)
+                    {
+                        var saveDialog = new SaveFileDialog
+                        {
+                            Filter = filter
+                        };
+                        return saveDialog.ShowDialog() == true ? saveDialog.FileName : null;
+                    }
+                    else
+                    {
+                        var openDialog = new OpenFileDialog
+                        {
+                            Filter = filter
+                        };
+                        return openDialog.ShowDialog() == true ? openDialog.FileName : null;
+                    }
+                });
+            });
         }
     }
 }
