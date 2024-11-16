@@ -1,68 +1,75 @@
-﻿using FactoryManager.Desktop.ViewModels;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Net.Http;
 using System.Threading.Tasks;
+using FactoryManager.Desktop.Models;
+using FactoryManager.Desktop.Services.Interfaces;
 
 namespace FactoryManager.Desktop.Services
 {
     public class ProductionService : IProductionService
     {
-        private readonly IHttpClient _httpClient;
-        private readonly IConfiguration _configuration;
+        private readonly HttpClient _httpClient;
+        private readonly string _baseUrl;
 
-        public ProductionService(IHttpClient httpClient, IConfiguration configuration)
+        public ProductionService(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
-            _configuration = configuration;
+            _baseUrl = configuration.GetValue<string>("ApiBaseUrl");
         }
 
-        public async Task<IEnumerable<ProductionOrder>> GetProductionOrdersAsync(string line = null, string status = null)
+        public async Task<IEnumerable<ProductionOrder>> GetProductionOrdersAsync()
         {
-            try
-            {
-                var url = $"{_configuration["ApiUrl"]}/production/orders";
-                if (!string.IsNullOrEmpty(line))
-                    url += $"?line={line}";
-                if (!string.IsNullOrEmpty(status))
-                    url += $"{(url.Contains("?") ? "&" : "?")}status={status}";
+            var response = await _httpClient.GetAsync($"{_baseUrl}/production/orders");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<IEnumerable<ProductionOrder>>();
+        }
 
-                var response = await _httpClient.GetAsync(url);
-                if (response.IsSuccessStatusCode)
-                {
-                    return await response.Content.ReadAsAsync<IEnumerable<ProductionOrder>>();
-                }
-                return new List<ProductionOrder>();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Get production orders error: {ex.Message}");
-                return new List<ProductionOrder>();
-            }
+        public async Task<IEnumerable<ProductionLine>> GetProductionLinesAsync()
+        {
+            var response = await _httpClient.GetAsync($"{_baseUrl}/production/lines");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<IEnumerable<ProductionLine>>();
+        }
+
+        public async Task<IEnumerable<string>> GetStatusesAsync()
+        {
+            var response = await _httpClient.GetAsync($"{_baseUrl}/production/statuses");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<IEnumerable<string>>();
         }
 
         public async Task<ProductionOrder> CreateOrderAsync(ProductionOrder order)
         {
-            try
-            {
-                var response = await _httpClient.PostAsync(
-                    $"{_configuration["ApiUrl"]}/production/orders",
-                    order);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    return await response.Content.ReadAsAsync<ProductionOrder>();
-                }
-                return null;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Create order error: {ex.Message}");
-                return null;
-            }
+            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/production/orders", order);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ProductionOrder>();
         }
 
-        // Implementacja pozostałych metod interfejsu...
+        public async Task StartProductionAsync(int orderId)
+        {
+            var response = await _httpClient.PostAsync($"{_baseUrl}/production/orders/{orderId}/start", null);
+            response.EnsureSuccessStatusCode();
+        }
+
+        public async Task PauseProductionAsync(int orderId)
+        {
+            var response = await _httpClient.PostAsync($"{_baseUrl}/production/orders/{orderId}/pause", null);
+            response.EnsureSuccessStatusCode();
+        }
+
+        public async Task CompleteOrderAsync(int orderId)
+        {
+            var response = await _httpClient.PostAsync($"{_baseUrl}/production/orders/{orderId}/complete", null);
+            response.EnsureSuccessStatusCode();
+        }
+
+        public async Task<ProductionStatistics> GetProductionStatisticsAsync()
+        {
+            var response = await _httpClient.GetAsync($"{_baseUrl}/production/statistics");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ProductionStatistics>();
+        }
     }
 }
