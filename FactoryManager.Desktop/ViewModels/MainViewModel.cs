@@ -1,27 +1,21 @@
-﻿using System.Windows.Input;
-using System.Collections.ObjectModel;
+﻿using System;
+using System.Windows.Input;
+using FactoryManager.Desktop.Commands;
+using FactoryManager.Desktop.Services;
 
 namespace FactoryManager.Desktop.ViewModels
 {
     public class MainViewModel : ViewModelBase
     {
+        private readonly IAuthenticationService _authService;
+        private readonly INotificationService _notificationService;
         private ViewModelBase _currentView;
-        private readonly DashboardViewModel _dashboardViewModel;
-        private readonly ProductionViewModel _productionViewModel;
-        private readonly WarehouseViewModel _warehouseViewModel;
-        private readonly PlanningViewModel _planningViewModel;
-        private readonly QualityViewModel _qualityViewModel;
-        private readonly ReportsViewModel _reportsViewModel;
-
-        public ViewModelBase CurrentView
-        {
-            get => _currentView;
-            set => SetProperty(ref _currentView, value);
-        }
-
-        public ICommand NavigateCommand { get; }
+        private string _userName;
+        private string _userRole;
 
         public MainViewModel(
+            IAuthenticationService authService,
+            INotificationService notificationService,
             DashboardViewModel dashboardViewModel,
             ProductionViewModel productionViewModel,
             WarehouseViewModel warehouseViewModel,
@@ -29,35 +23,88 @@ namespace FactoryManager.Desktop.ViewModels
             QualityViewModel qualityViewModel,
             ReportsViewModel reportsViewModel)
         {
-            _dashboardViewModel = dashboardViewModel;
-            _productionViewModel = productionViewModel;
-            _warehouseViewModel = warehouseViewModel;
-            _planningViewModel = planningViewModel;
-            _qualityViewModel = qualityViewModel;
-            _reportsViewModel = reportsViewModel;
+            _authService = authService;
+            _notificationService = notificationService;
 
-            NavigateCommand = new RelayCommand(ExecuteNavigation);
+            NavigateCommand = new RelayCommand(Navigate);
+            LogoutCommand = new RelayCommand(Logout);
 
-            // Domyślny widok
-            CurrentView = _dashboardViewModel;
+            ViewModels = new Dictionary<string, ViewModelBase>
+            {
+                { "dashboard", dashboardViewModel },
+                { "production", productionViewModel },
+                { "warehouse", warehouseViewModel },
+                { "planning", planningViewModel },
+                { "quality", qualityViewModel },
+                { "reports", reportsViewModel }
+            };
+
+            CurrentView = dashboardViewModel;
+            LoadUserInfo();
+            InitializeNotifications();
         }
 
-        private void ExecuteNavigation(object parameter)
+        public ViewModelBase CurrentView
         {
-            CurrentView = parameter?.ToString()?.ToLower() switch
+            get => _currentView;
+            set
             {
-                "dashboard" => _dashboardViewModel,
-                "production" => _productionViewModel,
-                "warehouse" => _warehouseViewModel,
-                "planning" => _planningViewModel,
-                "quality" => _qualityViewModel,
-                "reports" => _reportsViewModel,
-                _ => _dashboardViewModel
+                _currentView = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string UserName
+        {
+            get => _userName;
+            set
+            {
+                _userName = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string UserRole
+        {
+            get => _userRole;
+            set
+            {
+                _userRole = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public Dictionary<string, ViewModelBase> ViewModels { get; }
+        public ICommand NavigateCommand { get; }
+        public ICommand LogoutCommand { get; }
+
+        private void Navigate(object parameter)
+        {
+            if (parameter is string viewName && ViewModels.ContainsKey(viewName))
+            {
+                CurrentView = ViewModels[viewName];
+            }
+        }
+
+        private void Logout(object parameter)
+        {
+            _authService.Logout();
+            // Handle navigation to login window
+        }
+
+        private void LoadUserInfo()
+        {
+            var user = _authService.GetCurrentUser();
+            UserName = user.Name;
+            UserRole = user.Role;
+        }
+
+        private void InitializeNotifications()
+        {
+            _notificationService.OnNotificationReceived += (sender, notification) =>
+            {
+                // Handle notification display
             };
         }
-
-        public string UserName { get; set; }
-        public string UserRole { get; set; }
-        public ObservableCollection<string> Notifications { get; set; } = new();
     }
 }

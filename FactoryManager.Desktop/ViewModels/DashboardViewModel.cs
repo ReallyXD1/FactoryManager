@@ -2,158 +2,143 @@
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using FactoryManager.Desktop.Commands;
+using FactoryManager.Desktop.Services;
+using LiveCharts;
 
 namespace FactoryManager.Desktop.ViewModels
 {
     public class DashboardViewModel : ViewModelBase
     {
         private readonly IProductionService _productionService;
-        private readonly IWarehouseService _warehouseService;
         private readonly IQualityService _qualityService;
-
-        private double _currentOEE;
-        private int _activeOrders;
-        private int _completedOrders;
+        private readonly IWarehouseService _warehouseService;
+        private double _productionEfficiency;
         private double _qualityRate;
-        private string _selectedTimeRange = "Day";
+        private double _warehouseCapacity;
+        private string _productionTrend;
+        private string _qualityTrend;
+        private string _warehouseTrend;
 
-        public double CurrentOEE
+        public DashboardViewModel(
+            IProductionService productionService,
+            IQualityService qualityService,
+            IWarehouseService warehouseService)
         {
-            get => _currentOEE;
-            set => SetProperty(ref _currentOEE, value);
+            _productionService = productionService;
+            _qualityService = qualityService;
+            _warehouseService = warehouseService;
+
+            RefreshCommand = new AsyncRelayCommand(async _ => await LoadDataAsync());
+            ProductionSeries = new SeriesCollection();
+            QualitySeries = new SeriesCollection();
+
+            LoadDataAsync().ConfigureAwait(false);
         }
 
-        public int ActiveOrders
+        public double ProductionEfficiency
         {
-            get => _activeOrders;
-            set => SetProperty(ref _activeOrders, value);
-        }
-
-        public int CompletedOrders
-        {
-            get => _completedOrders;
-            set => SetProperty(ref _completedOrders, value);
+            get => _productionEfficiency;
+            set
+            {
+                _productionEfficiency = value;
+                OnPropertyChanged();
+            }
         }
 
         public double QualityRate
         {
             get => _qualityRate;
-            set => SetProperty(ref _qualityRate, value);
-        }
-
-        public string SelectedTimeRange
-        {
-            get => _selectedTimeRange;
             set
             {
-                if (SetProperty(ref _selectedTimeRange, value))
-                {
-                    RefreshDataCommand.Execute(null);
-                }
+                _qualityRate = value;
+                OnPropertyChanged();
             }
         }
 
-        public ObservableCollection<ProductionOrder> RecentOrders { get; } = new();
-        public ObservableCollection<Alert> ActiveAlerts { get; } = new();
-        public ObservableCollection<KpiData> KpiTrends { get; } = new();
-
-        public ICommand RefreshDataCommand { get; }
-        public ICommand ExportReportCommand { get; }
-
-        public DashboardViewModel(
-            IProductionService productionService,
-            IWarehouseService warehouseService,
-            IQualityService qualityService)
+        public double WarehouseCapacity
         {
-            _productionService = productionService;
-            _warehouseService = warehouseService;
-            _qualityService = qualityService;
-
-            RefreshDataCommand = new RelayCommand(async _ => await RefreshData());
-            ExportReportCommand = new RelayCommand(async _ => await ExportReport());
-
-            // Inicjalne załadowanie danych
-            Task.Run(RefreshData);
+            get => _warehouseCapacity;
+            set
+            {
+                _warehouseCapacity = value;
+                OnPropertyChanged();
+            }
         }
 
-        private async Task RefreshData()
+        public string ProductionTrend
+        {
+            get => _productionTrend;
+            set
+            {
+                _productionTrend = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string QualityTrend
+        {
+            get => _qualityTrend;
+            set
+            {
+                _qualityTrend = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string WarehouseTrend
+        {
+            get => _warehouseTrend;
+            set
+            {
+                _warehouseTrend = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public SeriesCollection ProductionSeries { get; private set; }
+        public SeriesCollection QualitySeries { get; private set; }
+        public ICommand RefreshCommand { get; }
+
+        private async Task LoadDataAsync()
         {
             try
             {
-                var productionData = await _productionService.GetProductionDataAsync(SelectedTimeRange);
-                var qualityData = await _qualityService.GetQualityDataAsync(SelectedTimeRange);
+                var productionStats = await _productionService.GetProductionStatisticsAsync();
+                ProductionEfficiency = productionStats.Efficiency;
+                ProductionTrend = FormatTrend(productionStats.Trend);
+                UpdateProductionChart(productionStats.ChartData);
 
-                CurrentOEE = productionData.OEE;
-                ActiveOrders = productionData.ActiveOrders;
-                CompletedOrders = productionData.CompletedOrders;
-                QualityRate = qualityData.QualityRate;
+                var qualityStats = await _qualityService.GetQualityStatisticsAsync();
+                QualityRate = qualityStats.QualityRate;
+                QualityTrend = FormatTrend(qualityStats.Trend);
+                UpdateQualityChart(qualityStats.ChartData);
 
-                UpdateRecentOrders(productionData.RecentOrders);
-                UpdateActiveAlerts();
-                UpdateKpiTrends();
+                var warehouseStats = await _warehouseService.GetWarehouseStatisticsAsync();
+                WarehouseCapacity = warehouseStats.Capacity;
+                WarehouseTrend = FormatTrend(warehouseStats.Trend);
             }
             catch (Exception ex)
             {
-                // Obsługa błędów
-                System.Diagnostics.Debug.WriteLine($"Error refreshing dashboard data: {ex.Message}");
+                // Handle error
             }
         }
 
-        private void UpdateRecentOrders(IEnumerable<ProductionOrder> orders)
+        private void UpdateProductionChart(IEnumerable<ChartDataPoint> data)
         {
-            RecentOrders.Clear();
-            foreach (var order in orders)
-            {
-                RecentOrders.Add(order);
-            }
+            ProductionSeries.Clear();
+            // Add series based on data
         }
 
-        private void UpdateActiveAlerts()
+        private void UpdateQualityChart(IEnumerable<ChartDataPoint> data)
         {
-            ActiveAlerts.Clear();
-            // Dodaj logikę pobierania alertów
+            QualitySeries.Clear();
+            // Add series based on data
         }
 
-        private void UpdateKpiTrends()
+        private string FormatTrend(double trend)
         {
-            KpiTrends.Clear();
-            // Dodaj logikę pobierania trendów KPI
+            return trend >= 0 ? $"+{trend:F1}%" : $"{trend:F1}%";
         }
-
-        private async Task ExportReport()
-        {
-            try
-            {
-                // Implementacja eksportu raportu
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error exporting report: {ex.Message}");
-            }
-        }
-    }
-
-    public class ProductionOrder
-    {
-        public string OrderNumber { get; set; }
-        public string ProductName { get; set; }
-        public int Quantity { get; set; }
-        public DateTime DueDate { get; set; }
-        public string Status { get; set; }
-    }
-
-    public class Alert
-    {
-        public string Type { get; set; }
-        public string Message { get; set; }
-        public DateTime TimeStamp { get; set; }
-        public string Severity { get; set; }
-    }
-
-    public class KpiData
-    {
-        public DateTime TimeStamp { get; set; }
-        public double Value { get; set; }
-        public string KpiName { get; set; }
     }
 }

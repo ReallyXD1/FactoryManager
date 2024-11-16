@@ -1,0 +1,59 @@
+﻿<Window x:Class="FactoryManager.Desktop.Views.Dialogs.NonConformityDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Report Non-Conformity" 
+        Height="500" Width="600"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Report Quality Non-Conformity" 
+                  FontSize="18" 
+                  FontWeight="Bold"
+                  Margin="0,0,0,20"/>
+
+        <StackPanel Grid.Row="1" Margin="0,0,0,20">
+            <TextBlock Text="Type"/>
+            <ComboBox ItemsSource="{Binding NonConformityTypes}"
+                      SelectedItem="{Binding SelectedType}"
+                      Margin="0,5,0,15"/>
+
+            <TextBlock Text="Severity Level"/>
+            <ComboBox ItemsSource="{Binding SeverityLevels}"
+                      SelectedItem="{Binding SelectedSeverity}"
+                      Margin="0,5,0,15"/>
+
+            <TextBlock Text="Description"/>
+            <TextBox Text="{Binding Description}"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     Height="100"
+                     Margin="0,5,0,15"/>
+
+            <TextBlock Text="Corrective Action"/>
+            <TextBox Text="{Binding CorrectiveAction}"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     Height="100"
+                     Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right">
+            <Button Content="Cancel" 
+                    Command="{Binding CancelCommand}"
+                    Style="{StaticResource SecondaryButton}"
+                    Margin="0,0,10,0"/>
+            <Button Content="Report" 
+                    Command="{Binding ReportCommand}"
+                    Style="{StaticResource PrimaryButton}"/>
+        </StackPanel>
+    </Grid>
+</Window>

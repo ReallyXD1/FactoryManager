@@ -1,12 +1,87 @@
-﻿<Window x:Class="FactoryManager.Desktop.MainWindow"
+﻿<Window x:Class="FactoryManager.Desktop.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:FactoryManager.Desktop"
+        xmlns:local="clr-namespace:FactoryManager.Desktop.Views"
+        xmlns:vm="clr-namespace:FactoryManager.Desktop.ViewModels"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="Factory Manager" Height="800" Width="1200"
+        WindowStartupLocation="CenterScreen">
 
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Navigation Panel -->
+        <StackPanel Grid.Column="0" Background="#1E1E1E">
+            <Image Source="/Assets/logo.png" Height="80" Margin="20"/>
+
+            <!-- User Info -->
+            <Border Padding="20" BorderBrush="#333" BorderThickness="0,0,0,1">
+                <StackPanel>
+                    <TextBlock Text="{Binding UserName}" Foreground="White" FontSize="16"/>
+                    <TextBlock Text="{Binding UserRole}" Foreground="#888" FontSize="12"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Navigation Buttons -->
+            <Button Content="Dashboard" 
+                    Command="{Binding NavigateCommand}" 
+                    CommandParameter="dashboard"
+                    Style="{StaticResource NavButton}"/>
+
+            <Button Content="Production" 
+                    Command="{Binding NavigateCommand}" 
+                    CommandParameter="production"
+                    Style="{StaticResource NavButton}"/>
+
+            <Button Content="Warehouse" 
+                    Command="{Binding NavigateCommand}" 
+                    CommandParameter="warehouse"
+                    Style="{StaticResource NavButton}"/>
+
+            <Button Content="Planning" 
+                    Command="{Binding NavigateCommand}" 
+                    CommandParameter="planning"
+                    Style="{StaticResource NavButton}"/>
+
+            <Button Content="Quality" 
+                    Command="{Binding NavigateCommand}" 
+                    CommandParameter="quality"
+                    Style="{StaticResource NavButton}"/>
+
+            <Button Content="Reports" 
+                    Command="{Binding NavigateCommand}" 
+                    CommandParameter="reports"
+                    Style="{StaticResource NavButton}"/>
+        </StackPanel>
+
+        <!-- Content Area -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="60"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Top Bar -->
+            <Border Grid.Row="0" Background="White" BorderBrush="#EEE" BorderThickness="0,0,0,1">
+                <Grid Margin="20,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource IconButton}">
+                            <Image Source="/Assets/notifications.png" Height="20"/>
+                        </Button>
+                        <Button Style="{StaticResource IconButton}">
+                            <Image Source="/Assets/settings.png" Height="20"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Main Content -->
+            <ContentControl Grid.Row="1" Content="{Binding CurrentView}"/>
+        </Grid>
     </Grid>
 </Window>
