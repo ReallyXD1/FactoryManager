@@ -1,0 +1,29 @@
+﻿<Window x:Class="FactoryManager.Desktop.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:FactoryManager.Desktop.Views"
+        mc:Ignorable="d"
+        Title="Factory Manager" Height="800" Width="1200"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Menu boczne -->
+        <StackPanel Grid.Column="0" Background="#FF2D2D30">
+            <Button Content="Dashboard" Height="50" Command="{Binding NavigateToCommand}" CommandParameter="Dashboard"/>
+            <Button Content="Produkcja" Height="50" Command="{Binding NavigateToCommand}" CommandParameter="Production"/>
+            <Button Content="Magazyn" Height="50" Command="{Binding NavigateToCommand}" CommandParameter="Warehouse"/>
+            <Button Content="Planowanie" Height="50" Command="{Binding NavigateToCommand}" CommandParameter="Planning"/>
+            <Button Content="Jakość" Height="50" Command="{Binding NavigateToCommand}" CommandParameter="Quality"/>
+            <Button Content="Raporty" Height="50" Command="{Binding NavigateToCommand}" CommandParameter="Reports"/>
+        </StackPanel>
+
+        <!-- Główny obszar zawartości -->
+        <ContentControl Grid.Column="1" Content="{Binding CurrentView}"/>
+    </Grid>
+</Window>
