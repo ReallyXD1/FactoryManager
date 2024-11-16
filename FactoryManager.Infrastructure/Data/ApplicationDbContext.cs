@@ -24,5 +24,5 @@ namespace FactoryManager.Infrastructure.Data
         {
             base.OnModelCreating(modelBuilder);
         }
-    }sdadasdas
+    }
 }
