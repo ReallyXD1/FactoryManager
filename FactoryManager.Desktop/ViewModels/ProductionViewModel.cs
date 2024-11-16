@@ -2,40 +2,94 @@
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using FactoryManager.Desktop.Commands;
+using FactoryManager.Desktop.Models;
+using FactoryManager.Desktop.Services;
+using FactoryManager.Desktop.Views.Dialogs;
 
 namespace FactoryManager.Desktop.ViewModels
 {
     public class ProductionViewModel : ViewModelBase
     {
         private readonly IProductionService _productionService;
-        private readonly IQualityService _qualityService;
-
+        private readonly IDialogService _dialogService;
+        private ObservableCollection<ProductionOrder> _productionOrders;
+        private ObservableCollection<ProductionLine> _productionLines;
+        private ObservableCollection<string> _statuses;
         private ProductionOrder _selectedOrder;
-        private string _selectedLine;
+        private ProductionLine _selectedLine;
         private string _selectedStatus;
-        private bool _isLoading;
+        private DateTime? _selectedDate;
+
+        public ProductionViewModel(
+            IProductionService productionService,
+            IDialogService dialogService)
+        {
+            _productionService = productionService;
+            _dialogService = dialogService;
+
+            ProductionOrders = new ObservableCollection<ProductionOrder>();
+            ProductionLines = new ObservableCollection<ProductionLine>();
+            Statuses = new ObservableCollection<string>();
+
+            CreateOrderCommand = new AsyncRelayCommand(async _ => await CreateOrderAsync());
+            StartProductionCommand = new AsyncRelayCommand(async _ => await StartProductionAsync());
+            PauseProductionCommand = new AsyncRelayCommand(async _ => await PauseProductionAsync());
+            CompleteOrderCommand = new AsyncRelayCommand(async _ => await CompleteOrderAsync());
+            RefreshCommand = new AsyncRelayCommand(async _ => await LoadDataAsync());
+
+            LoadDataAsync().ConfigureAwait(false);
+        }
+
+        public ObservableCollection<ProductionOrder> ProductionOrders
+        {
+            get => _productionOrders;
+            set
+            {
+                _productionOrders = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<ProductionLine> ProductionLines
+        {
+            get => _productionLines;
+            set
+            {
+                _productionLines = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<string> Statuses
+        {
+            get => _statuses;
+            set
+            {
+                _statuses = value;
+                OnPropertyChanged();
+            }
+        }
 
         public ProductionOrder SelectedOrder
         {
             get => _selectedOrder;
             set
             {
-                if (SetProperty(ref _selectedOrder, value))
-                {
-                    LoadOrderDetails();
-                }
+                _selectedOrder = value;
+                OnPropertyChanged();
+                UpdateCommandsState();
             }
         }
 
-        public string SelectedLine
+        public ProductionLine SelectedLine
         {
             get => _selectedLine;
             set
             {
-                if (SetProperty(ref _selectedLine, value))
-                {
-                    RefreshOrdersCommand.Execute(null);
-                }
+                _selectedLine = value;
+                OnPropertyChanged();
+                FilterOrders();
             }
         }
 
@@ -44,219 +98,117 @@ namespace FactoryManager.Desktop.ViewModels
             get => _selectedStatus;
             set
             {
-                if (SetProperty(ref _selectedStatus, value))
-                {
-                    RefreshOrdersCommand.Execute(null);
-                }
+                _selectedStatus = value;
+                OnPropertyChanged();
+                FilterOrders();
             }
         }
 
-        public bool IsLoading
+        public DateTime? SelectedDate
         {
-            get => _isLoading;
-            set => SetProperty(ref _isLoading, value);
+            get => _selectedDate;
+            set
+            {
+                _selectedDate = value;
+                OnPropertyChanged();
+                FilterOrders();
+            }
         }
 
-        public ObservableCollection<ProductionOrder> ProductionOrders { get; } = new();
-        public ObservableCollection<ProductionLine> ProductionLines { get; } = new();
-        public ObservableCollection<ProductionStatus> StatusList { get; } = new();
-        public ObservableCollection<ProductionEvent> ProductionEvents { get; } = new();
-
-        public ICommand RefreshOrdersCommand { get; }
         public ICommand CreateOrderCommand { get; }
         public ICommand StartProductionCommand { get; }
         public ICommand PauseProductionCommand { get; }
         public ICommand CompleteOrderCommand { get; }
-        public ICommand ReportIssueCommand { get; }
+        public ICommand RefreshCommand { get; }
 
-        public ProductionViewModel(
-            IProductionService productionService,
-            IQualityService qualityService)
-        {
-            _productionService = productionService;
-            _qualityService = qualityService;
-
-            RefreshOrdersCommand = new RelayCommand(async _ => await RefreshOrders());
-            CreateOrderCommand = new RelayCommand(async _ => await CreateOrder());
-            StartProductionCommand = new RelayCommand(async _ => await StartProduction(), CanStartProduction);
-            PauseProductionCommand = new RelayCommand(async _ => await PauseProduction(), CanPauseProduction);
-            CompleteOrderCommand = new RelayCommand(async _ => await CompleteOrder(), CanCompleteOrder);
-            ReportIssueCommand = new RelayCommand(async _ => await ReportIssue());
-
-            InitializeData();
-        }
-
-        private async void InitializeData()
-        {
-            await LoadProductionLines();
-            await LoadStatusList();
-            await RefreshOrders();
-        }
-
-        private async Task LoadProductionLines()
+        private async Task LoadDataAsync()
         {
             try
             {
+                var orders = await _productionService.GetProductionOrdersAsync();
+                ProductionOrders = new ObservableCollection<ProductionOrder>(orders);
+
                 var lines = await _productionService.GetProductionLinesAsync();
-                ProductionLines.Clear();
-                foreach (var line in lines)
-                {
-                    ProductionLines.Add(line);
-                }
+                ProductionLines = new ObservableCollection<ProductionLine>(lines);
+
+                Statuses = new ObservableCollection<string>(await _productionService.GetStatusesAsync());
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading production lines: {ex.Message}");
+                await _dialogService.ShowErrorAsync("Error loading data", ex.Message);
             }
         }
 
-        private async Task LoadStatusList()
+        private async Task CreateOrderAsync()
         {
-            try
+            var dialog = new NewOrderDialog();
+            if (await _dialogService.ShowDialogAsync(dialog) == true)
             {
-                var statuses = await _productionService.GetProductionStatusesAsync();
-                StatusList.Clear();
-                foreach (var status in statuses)
+                try
                 {
-                    StatusList.Add(status);
+                    await _productionService.CreateOrderAsync(dialog.ViewModel.Order);
+                    await LoadDataAsync();
+                }
+                catch (Exception ex)
+                {
+                    await _dialogService.ShowErrorAsync("Error creating order", ex.Message);
                 }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading status list: {ex.Message}");
-            }
         }
 
-        private async Task RefreshOrders()
-        {
-            IsLoading = true;
-            try
-            {
-                var orders = await _productionService.GetProductionOrdersAsync(SelectedLine, SelectedStatus);
-                ProductionOrders.Clear();
-                foreach (var order in orders)
-                {
-                    ProductionOrders.Add(order);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error refreshing orders: {ex.Message}");
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
-        private async void LoadOrderDetails()
-        {
-            if (SelectedOrder == null) return;
-
-            try
-            {
-                var events = await _productionService.GetProductionEventsAsync(SelectedOrder.Id);
-                ProductionEvents.Clear();
-                foreach (var evt in events)
-                {
-                    ProductionEvents.Add(evt);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading order details: {ex.Message}");
-            }
-        }
-
-        private async Task CreateOrder()
-        {
-            // Implementacja tworzenia nowego zlecenia
-        }
-
-        private async Task StartProduction()
+        private async Task StartProductionAsync()
         {
             if (SelectedOrder == null) return;
 
             try
             {
                 await _productionService.StartProductionAsync(SelectedOrder.Id);
-                await RefreshOrders();
+                await LoadDataAsync();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error starting production: {ex.Message}");
+                await _dialogService.ShowErrorAsync("Error starting production", ex.Message);
             }
         }
 
-        private bool CanStartProduction(object parameter)
-        {
-            return SelectedOrder != null && SelectedOrder.Status == "Planned";
-        }
-
-        private async Task PauseProduction()
+        private async Task PauseProductionAsync()
         {
             if (SelectedOrder == null) return;
 
             try
             {
                 await _productionService.PauseProductionAsync(SelectedOrder.Id);
-                await RefreshOrders();
+                await LoadDataAsync();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error pausing production: {ex.Message}");
+                await _dialogService.ShowErrorAsync("Error pausing production", ex.Message);
             }
         }
 
-        private bool CanPauseProduction(object parameter)
-        {
-            return SelectedOrder != null && SelectedOrder.Status == "InProgress";
-        }
-
-        private async Task CompleteOrder()
+        private async Task CompleteOrderAsync()
         {
             if (SelectedOrder == null) return;
 
             try
             {
                 await _productionService.CompleteOrderAsync(SelectedOrder.Id);
-                await RefreshOrders();
+                await LoadDataAsync();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error completing order: {ex.Message}");
+                await _dialogService.ShowErrorAsync("Error completing order", ex.Message);
             }
         }
 
-        private bool CanCompleteOrder(object parameter)
+        private void FilterOrders()
         {
-            return SelectedOrder != null && SelectedOrder.Status == "InProgress";
+            // Implement filtering logic based on selected line, status and date
         }
 
-        private async Task ReportIssue()
+        private void UpdateCommandsState()
         {
-            // Implementacja zgłaszania problemu
+            // Update commands' CanExecute state based on selected order
         }
-    }
-
-    public class ProductionLine
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public string Status { get; set; }
-    }
-
-    public class ProductionStatus
-    {
-        public string Code { get; set; }
-        public string Name { get; set; }
-    }
-
-    public class ProductionEvent
-    {
-        public DateTime Timestamp { get; set; }
-        public string EventType { get; set; }
-        public string Description { get; set; }
-        public string User { get; set; }
     }
 }

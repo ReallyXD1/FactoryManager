@@ -2,269 +2,244 @@
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using FactoryManager.Desktop.Commands;
+using FactoryManager.Desktop.Models;
+using FactoryManager.Desktop.Services;
+using FactoryManager.Desktop.Views.Dialogs;
+using LiveCharts;
 
 namespace FactoryManager.Desktop.ViewModels
 {
     public class ReportsViewModel : ViewModelBase
     {
         private readonly IReportService _reportService;
-        private readonly IProductionService _productionService;
-        private readonly IQualityService _qualityService;
-
+        private readonly IDialogService _dialogService;
+        private ObservableCollection<ReportType> _reportTypes;
+        private ObservableCollection<Report> _reports;
+        private ReportType _selectedReportType;
         private Report _selectedReport;
-        private string _selectedReportType;
         private DateTime _startDate;
         private DateTime _endDate;
-        private bool _isLoading;
+        private SeriesCollection _chartData;
+
+        public ReportsViewModel(
+            IReportService reportService,
+            IDialogService dialogService)
+        {
+            _reportService = reportService;
+            _dialogService = dialogService;
+
+            ReportTypes = new ObservableCollection<ReportType>();
+            Reports = new ObservableCollection<Report>();
+            ChartData = new SeriesCollection();
+
+            StartDate = DateTime.Today.AddMonths(-1);
+            EndDate = DateTime.Today;
+
+            GenerateReportCommand = new AsyncRelayCommand(async _ => await GenerateReportAsync());
+            ScheduleReportCommand = new AsyncRelayCommand(async _ => await ScheduleReportAsync());
+            ExportReportCommand = new AsyncRelayCommand(async _ => await ExportReportAsync());
+            ShareReportCommand = new AsyncRelayCommand(async _ => await ShareReportAsync());
+            RefreshCommand = new AsyncRelayCommand(async _ => await LoadDataAsync());
+
+            LoadDataAsync().ConfigureAwait(false);
+        }
+
+        public ObservableCollection<ReportType> ReportTypes
+        {
+            get => _reportTypes;
+            set
+            {
+                _reportTypes = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<Report> Reports
+        {
+            get => _reports;
+            set
+            {
+                _reports = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ReportType SelectedReportType
+        {
+            get => _selectedReportType;
+            set
+            {
+                _selectedReportType = value;
+                OnPropertyChanged();
+                UpdatePreview();
+            }
+        }
 
         public Report SelectedReport
         {
             get => _selectedReport;
             set
             {
-                if (SetProperty(ref _selectedReport, value))
-                {
-                    LoadReportDetails();
-                }
-            }
-        }
-
-        public string SelectedReportType
-        {
-            get => _selectedReportType;
-            set
-            {
-                if (SetProperty(ref _selectedReportType, value))
-                {
-                    GenerateReportCommand.Execute(null);
-                }
+                _selectedReport = value;
+                OnPropertyChanged();
+                UpdateCommandsState();
             }
         }
 
         public DateTime StartDate
         {
             get => _startDate;
-            set => SetProperty(ref _startDate, value);
+            set
+            {
+                _startDate = value;
+                OnPropertyChanged();
+                UpdatePreview();
+            }
         }
 
         public DateTime EndDate
         {
             get => _endDate;
-            set => SetProperty(ref _endDate, value);
+            set
+            {
+                _endDate = value;
+                OnPropertyChanged();
+                UpdatePreview();
+            }
         }
 
-        public bool IsLoading
+        public SeriesCollection ChartData
         {
-            get => _isLoading;
-            set => SetProperty(ref _isLoading, value);
+            get => _chartData;
+            set
+            {
+                _chartData = value;
+                OnPropertyChanged();
+            }
         }
-
-        public ObservableCollection<Report> Reports { get; } = new();
-        public ObservableCollection<ReportType> ReportTypes { get; } = new();
-        public ObservableCollection<KpiIndicator> KpiIndicators { get; } = new();
-        public ObservableCollection<ChartData> ChartData { get; } = new();
 
         public ICommand GenerateReportCommand { get; }
-        public ICommand ExportReportCommand { get; }
         public ICommand ScheduleReportCommand { get; }
+        public ICommand ExportReportCommand { get; }
         public ICommand ShareReportCommand { get; }
+        public ICommand RefreshCommand { get; }
 
-        public ReportsViewModel(
-            IReportService reportService,
-            IProductionService productionService,
-            IQualityService qualityService)
-        {
-            _reportService = reportService;
-            _productionService = productionService;
-            _qualityService = qualityService;
-
-            StartDate = DateTime.Today.AddMonths(-1);
-            EndDate = DateTime.Today;
-
-            GenerateReportCommand = new RelayCommand(async _ => await GenerateReport());
-            ExportReportCommand = new RelayCommand(async _ => await ExportReport(), CanExportReport);
-            ScheduleReportCommand = new RelayCommand(async _ => await ScheduleReport());
-            ShareReportCommand = new RelayCommand(async _ => await ShareReport(), CanShareReport);
-
-            InitializeData();
-        }
-
-        private async void InitializeData()
-        {
-            await LoadReportTypes();
-            await LoadKpiIndicators();
-            await LoadReports();
-        }
-
-        private async Task LoadReportTypes()
+        private async Task LoadDataAsync()
         {
             try
             {
-                var types = await _reportService.GetReportTypesAsync();
-                ReportTypes.Clear();
-                foreach (var type in types)
-                {
-                    ReportTypes.Add(type);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading report types: {ex.Message}");
-            }
-        }
+                var reportTypes = await _reportService.GetReportTypesAsync();
+                ReportTypes = new ObservableCollection<ReportType>(reportTypes);
 
-        private async Task LoadKpiIndicators()
-        {
-            try
-            {
-                var indicators = await _reportService.GetKpiIndicatorsAsync();
-                KpiIndicators.Clear();
-                foreach (var indicator in indicators)
-                {
-                    KpiIndicators.Add(indicator);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading KPI indicators: {ex.Message}");
-            }
-        }
-
-        private async Task LoadReports()
-        {
-            IsLoading = true;
-            try
-            {
                 var reports = await _reportService.GetReportsAsync();
-                Reports.Clear();
-                foreach (var report in reports)
-                {
-                    Reports.Add(report);
-                }
+                Reports = new ObservableCollection<Report>(reports);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading reports: {ex.Message}");
-            }
-            finally
-            {
-                IsLoading = false;
+                await _dialogService.ShowErrorAsync("Error loading data", ex.Message);
             }
         }
 
-        private async void LoadReportDetails()
+        private async Task GenerateReportAsync()
         {
-            if (SelectedReport == null) return;
+            if (SelectedReportType == null) return;
 
             try
             {
-                var chartData = await _reportService.GetReportChartDataAsync(SelectedReport.Id);
-                ChartData.Clear();
-                foreach (var data in chartData)
-                {
-                    ChartData.Add(data);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading report details: {ex.Message}");
-            }
-        }
+                var report = await _reportService.GenerateReportAsync(
+                    SelectedReportType.Id,
+                    StartDate,
+                    EndDate);
 
-        private async Task GenerateReport()
-        {
-            if (string.IsNullOrEmpty(SelectedReportType)) return;
-
-            IsLoading = true;
-            try
-            {
-                var report = await _reportService.GenerateReportAsync(SelectedReportType, StartDate, EndDate);
-                Reports.Add(report);
+                Reports.Insert(0, report);
                 SelectedReport = report;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error generating report: {ex.Message}");
-            }
-            finally
-            {
-                IsLoading = false;
+                await _dialogService.ShowErrorAsync("Error generating report", ex.Message);
             }
         }
 
-        private async Task ExportReport()
+        private async Task ScheduleReportAsync()
+        {
+            var dialog = new ScheduleReportDialog();
+            if (await _dialogService.ShowDialogAsync(dialog) == true)
+            {
+                try
+                {
+                    await _reportService.ScheduleReportAsync(dialog.ViewModel.Schedule);
+                }
+                catch (Exception ex)
+                {
+                    await _dialogService.ShowErrorAsync("Error scheduling report", ex.Message);
+                }
+            }
+        }
+
+        private async Task ExportReportAsync()
         {
             if (SelectedReport == null) return;
 
             try
             {
-                await _reportService.ExportReportAsync(SelectedReport.Id);
+                var path = await _dialogService.ShowSaveFileDialogAsync(
+                    "Export Report",
+                    "PDF Files|*.pdf|Excel Files|*.xlsx");
+
+                if (!string.IsNullOrEmpty(path))
+                {
+                    await _reportService.ExportReportAsync(SelectedReport.Id, path);
+                }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error exporting report: {ex.Message}");
+                await _dialogService.ShowErrorAsync("Error exporting report", ex.Message);
             }
         }
 
-        private bool CanExportReport(object parameter)
-        {
-            return SelectedReport != null;
-        }
-
-        private async Task ScheduleReport()
-        {
-            // Implementacja harmonogramowania raportu
-        }
-
-        private async Task ShareReport()
+        private async Task ShareReportAsync()
         {
             if (SelectedReport == null) return;
 
+            var dialog = new ShareReportDialog();
+            if (await _dialogService.ShowDialogAsync(dialog) == true)
+            {
+                try
+                {
+                    await _reportService.ShareReportAsync(
+                        SelectedReport.Id,
+                        dialog.ViewModel.Recipients);
+                }
+                catch (Exception ex)
+                {
+                    await _dialogService.ShowErrorAsync("Error sharing report", ex.Message);
+                }
+            }
+        }
+
+        private async void UpdatePreview()
+        {
+            if (SelectedReportType == null) return;
+
             try
             {
-                await _reportService.ShareReportAsync(SelectedReport.Id);
+                var previewData = await _reportService.GetReportPreviewAsync(
+                    SelectedReportType.Id,
+                    StartDate,
+                    EndDate);
+
+                ChartData = new SeriesCollection(previewData.Series);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                System.Diagnostics.Debug.WriteLine($"Error sharing report: {ex.Message}");
+                // Handle preview update error silently
             }
         }
 
-        private bool CanShareReport(object parameter)
+        private void UpdateCommandsState()
         {
-            return SelectedReport != null;
+            // Update commands' CanExecute state based on selected report
         }
-    }
-
-    public class Report
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public string Type { get; set; }
-        public DateTime GeneratedDate { get; set; }
-        public string Status { get; set; }
-    }
-
-    public class ReportType
-    {
-        public string Code { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-    }
-
-    public class KpiIndicator
-    {
-        public string Code { get; set; }
-        public string Name { get; set; }
-        public double Value { get; set; }
-        public string Unit { get; set; }
-        public double Target { get; set; }
-    }
-
-    public class ChartData
-    {
-        public DateTime Date { get; set; }
-        public string Category { get; set; }
-        public double Value { get; set; }
     }
 }

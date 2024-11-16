@@ -2,40 +2,94 @@
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using FactoryManager.Desktop.Commands;
+using FactoryManager.Desktop.Models;
+using FactoryManager.Desktop.Services;
+using FactoryManager.Desktop.Views.Dialogs;
 
 namespace FactoryManager.Desktop.ViewModels
 {
     public class QualityViewModel : ViewModelBase
     {
         private readonly IQualityService _qualityService;
-        private readonly IProductionService _productionService;
-
+        private readonly IDialogService _dialogService;
+        private ObservableCollection<QualityControl> _controls;
+        private ObservableCollection<string> _controlTypes;
+        private ObservableCollection<string> _statuses;
         private QualityControl _selectedControl;
-        private NonConformity _selectedNonConformity;
+        private string _selectedType;
         private string _selectedStatus;
-        private bool _isLoading;
+
+        public QualityViewModel(
+            IQualityService qualityService,
+            IDialogService dialogService)
+        {
+            _qualityService = qualityService;
+            _dialogService = dialogService;
+
+            Controls = new ObservableCollection<QualityControl>();
+            ControlTypes = new ObservableCollection<string>();
+            Statuses = new ObservableCollection<string>();
+
+            CreateControlCommand = new AsyncRelayCommand(async _ => await CreateControlAsync());
+            StartControlCommand = new AsyncRelayCommand(async _ => await StartControlAsync());
+            CompleteControlCommand = new AsyncRelayCommand(async _ => await CompleteControlAsync());
+            ReportNonConformityCommand = new AsyncRelayCommand(async _ => await ReportNonConformityAsync());
+            GenerateReportCommand = new AsyncRelayCommand(async _ => await GenerateReportAsync());
+            RefreshCommand = new AsyncRelayCommand(async _ => await LoadDataAsync());
+
+            LoadDataAsync().ConfigureAwait(false);
+        }
+
+        public ObservableCollection<QualityControl> Controls
+        {
+            get => _controls;
+            set
+            {
+                _controls = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<string> ControlTypes
+        {
+            get => _controlTypes;
+            set
+            {
+                _controlTypes = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<string> Statuses
+        {
+            get => _statuses;
+            set
+            {
+                _statuses = value;
+                OnPropertyChanged();
+            }
+        }
 
         public QualityControl SelectedControl
         {
             get => _selectedControl;
             set
             {
-                if (SetProperty(ref _selectedControl, value))
-                {
-                    LoadControlDetails();
-                }
+                _selectedControl = value;
+                OnPropertyChanged();
+                UpdateCommandsState();
             }
         }
 
-        public NonConformity SelectedNonConformity
+        public string SelectedType
         {
-            get => _selectedNonConformity;
+            get => _selectedType;
             set
             {
-                if (SetProperty(ref _selectedNonConformity, value))
-                {
-                    LoadNonConformityDetails();
-                }
+                _selectedType = value;
+                OnPropertyChanged();
+                FilterControls();
             }
         }
 
@@ -44,233 +98,122 @@ namespace FactoryManager.Desktop.ViewModels
             get => _selectedStatus;
             set
             {
-                if (SetProperty(ref _selectedStatus, value))
-                {
-                    RefreshControlsCommand.Execute(null);
-                }
+                _selectedStatus = value;
+                OnPropertyChanged();
+                FilterControls();
             }
         }
 
-        public bool IsLoading
-        {
-            get => _isLoading;
-            set => SetProperty(ref _isLoading, value);
-        }
-
-        public ObservableCollection<QualityControl> Controls { get; } = new();
-        public ObservableCollection<NonConformity> NonConformities { get; } = new();
-        public ObservableCollection<QualityParameter> Parameters { get; } = new();
-        public ObservableCollection<QualityAlert> Alerts { get; } = new();
-
-        public ICommand RefreshControlsCommand { get; }
         public ICommand CreateControlCommand { get; }
         public ICommand StartControlCommand { get; }
         public ICommand CompleteControlCommand { get; }
         public ICommand ReportNonConformityCommand { get; }
         public ICommand GenerateReportCommand { get; }
+        public ICommand RefreshCommand { get; }
 
-        public QualityViewModel(
-            IQualityService qualityService,
-            IProductionService productionService)
-        {
-            _qualityService = qualityService;
-            _productionService = productionService;
-
-            RefreshControlsCommand = new RelayCommand(async _ => await RefreshControls());
-            CreateControlCommand = new RelayCommand(async _ => await CreateControl());
-            StartControlCommand = new RelayCommand(async _ => await StartControl(), CanStartControl);
-            CompleteControlCommand = new RelayCommand(async _ => await CompleteControl(), CanCompleteControl);
-            ReportNonConformityCommand = new RelayCommand(async _ => await ReportNonConformity());
-            GenerateReportCommand = new RelayCommand(async _ => await GenerateReport());
-
-            InitializeData();
-        }
-
-        private async void InitializeData()
-        {
-            await LoadParameters();
-            await RefreshControls();
-            await LoadAlerts();
-        }
-
-        private async Task LoadParameters()
+        private async Task LoadDataAsync()
         {
             try
             {
-                var parameters = await _qualityService.GetQualityParametersAsync();
-                Parameters.Clear();
-                foreach (var parameter in parameters)
+                var controls = await _qualityService.GetQualityControlsAsync();
+                Controls = new ObservableCollection<QualityControl>(controls);
+
+                ControlTypes = new ObservableCollection<string>(await _qualityService.GetControlTypesAsync());
+                Statuses = new ObservableCollection<string>(await _qualityService.GetStatusesAsync());
+            }
+            catch (Exception ex)
+            {
+                await _dialogService.ShowErrorAsync("Error loading data", ex.Message);
+            }
+        }
+
+        private async Task CreateControlAsync()
+        {
+            var dialog = new QualityControlDialog();
+            if (await _dialogService.ShowDialogAsync(dialog) == true)
+            {
+                try
                 {
-                    Parameters.Add(parameter);
+                    await _qualityService.CreateControlAsync(dialog.ViewModel.Control);
+                    await LoadDataAsync();
+                }
+                catch (Exception ex)
+                {
+                    await _dialogService.ShowErrorAsync("Error creating control", ex.Message);
                 }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading parameters: {ex.Message}");
-            }
         }
 
-        private async Task RefreshControls()
-        {
-            IsLoading = true;
-            try
-            {
-                var controls = await _qualityService.GetQualityControlsAsync(SelectedStatus);
-                Controls.Clear();
-                foreach (var control in controls)
-                {
-                    Controls.Add(control);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error refreshing controls: {ex.Message}");
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
-        private async Task LoadAlerts()
-        {
-            try
-            {
-                var alerts = await _qualityService.GetQualityAlertsAsync();
-                Alerts.Clear();
-                foreach (var alert in alerts)
-                {
-                    Alerts.Add(alert);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading alerts: {ex.Message}");
-            }
-        }
-
-        private async void LoadControlDetails()
-        {
-            if (SelectedControl == null) return;
-
-            try
-            {
-                var nonConformities = await _qualityService.GetControlNonConformitiesAsync(SelectedControl.Id);
-                NonConformities.Clear();
-                foreach (var nonConformity in nonConformities)
-                {
-                    NonConformities.Add(nonConformity);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading control details: {ex.Message}");
-            }
-        }
-
-        private async void LoadNonConformityDetails()
-        {
-            if (SelectedNonConformity == null) return;
-
-            try
-            {
-                // Załaduj szczegóły niezgodności
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading nonconformity details: {ex.Message}");
-            }
-        }
-
-        private async Task CreateControl()
-        {
-            // Implementacja tworzenia nowej kontroli
-        }
-
-        private async Task StartControl()
+        private async Task StartControlAsync()
         {
             if (SelectedControl == null) return;
 
             try
             {
                 await _qualityService.StartControlAsync(SelectedControl.Id);
-                await RefreshControls();
+                await LoadDataAsync();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error starting control: {ex.Message}");
+                await _dialogService.ShowErrorAsync("Error starting control", ex.Message);
             }
         }
 
-        private bool CanStartControl(object parameter)
-        {
-            return SelectedControl != null && SelectedControl.Status == "Planned";
-        }
-
-        private async Task CompleteControl()
+        private async Task CompleteControlAsync()
         {
             if (SelectedControl == null) return;
 
             try
             {
                 await _qualityService.CompleteControlAsync(SelectedControl.Id);
-                await RefreshControls();
+                await LoadDataAsync();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error completing control: {ex.Message}");
+                await _dialogService.ShowErrorAsync("Error completing control", ex.Message);
             }
         }
 
-        private bool CanCompleteControl(object parameter)
+        private async Task ReportNonConformityAsync()
         {
-            return SelectedControl != null && SelectedControl.Status == "InProgress";
+            if (SelectedControl == null) return;
+
+            var dialog = new NonConformityDialog();
+            if (await _dialogService.ShowDialogAsync(dialog) == true)
+            {
+                try
+                {
+                    await _qualityService.ReportNonConformityAsync(SelectedControl.Id, dialog.ViewModel.NonConformity);
+                    await LoadDataAsync();
+                }
+                catch (Exception ex)
+                {
+                    await _dialogService.ShowErrorAsync("Error reporting non-conformity", ex.Message);
+                }
+            }
         }
 
-        private async Task ReportNonConformity()
+        private async Task GenerateReportAsync()
         {
-            // Implementacja zgłaszania niezgodności
+            try
+            {
+                var report = await _qualityService.GenerateReportAsync();
+                await _dialogService.ShowReportAsync(report);
+            }
+            catch (Exception ex)
+            {
+                await _dialogService.ShowErrorAsync("Error generating report", ex.Message);
+            }
         }
 
-        private async Task GenerateReport()
+        private void FilterControls()
         {
-            // Implementacja generowania raportu
+            // Implement filtering logic based on type and status
         }
-    }
 
-    public class QualityControl
-    {
-        public int Id { get; set; }
-        public string ControlNumber { get; set; }
-        public string Type { get; set; }
-        public DateTime Date { get; set; }
-        public string Status { get; set; }
-        public string Result { get; set; }
-    }
-
-    public class NonConformity
-    {
-        public int Id { get; set; }
-        public string Number { get; set; }
-        public string Description { get; set; }
-        public string Severity { get; set; }
-        public string Status { get; set; }
-    }
-
-    public class QualityParameter
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public string Unit { get; set; }
-        public double MinValue { get; set; }
-        public double MaxValue { get; set; }
-    }
-
-    public class QualityAlert
-    {
-        public string Type { get; set; }
-        public string Message { get; set; }
-        public DateTime Timestamp { get; set; }
-        public string Priority { get; set; }
+        private void UpdateCommandsState()
+        {
+            // Update commands' CanExecute state based on selected control
+        }
     }
 }

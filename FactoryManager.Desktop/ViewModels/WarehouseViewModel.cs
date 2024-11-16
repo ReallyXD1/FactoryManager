@@ -2,26 +2,93 @@
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using FactoryManager.Desktop.Commands;
+using FactoryManager.Desktop.Models;
+using FactoryManager.Desktop.Services;
+using FactoryManager.Desktop.Views.Dialogs;
 
 namespace FactoryManager.Desktop.ViewModels
 {
     public class WarehouseViewModel : ViewModelBase
     {
         private readonly IWarehouseService _warehouseService;
+        private readonly IDialogService _dialogService;
+        private ObservableCollection<WarehouseItem> _warehouseItems;
+        private ObservableCollection<Category> _categories;
+        private ObservableCollection<Location> _locations;
         private WarehouseItem _selectedItem;
+        private Category _selectedCategory;
         private Location _selectedLocation;
         private string _searchQuery;
-        private bool _isLoading;
+
+        public WarehouseViewModel(
+            IWarehouseService warehouseService,
+            IDialogService dialogService)
+        {
+            _warehouseService = warehouseService;
+            _dialogService = dialogService;
+
+            WarehouseItems = new ObservableCollection<WarehouseItem>();
+            Categories = new ObservableCollection<Category>();
+            Locations = new ObservableCollection<Location>();
+
+            ReceiveItemsCommand = new AsyncRelayCommand(async _ => await ReceiveItemsAsync());
+            IssueItemsCommand = new AsyncRelayCommand(async _ => await IssueItemsAsync());
+            MoveItemCommand = new AsyncRelayCommand(async _ => await MoveItemAsync());
+            RefreshCommand = new AsyncRelayCommand(async _ => await LoadDataAsync());
+
+            LoadDataAsync().ConfigureAwait(false);
+        }
+
+        public ObservableCollection<WarehouseItem> WarehouseItems
+        {
+            get => _warehouseItems;
+            set
+            {
+                _warehouseItems = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<Category> Categories
+        {
+            get => _categories;
+            set
+            {
+                _categories = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<Location> Locations
+        {
+            get => _locations;
+            set
+            {
+                _locations = value;
+                OnPropertyChanged();
+            }
+        }
 
         public WarehouseItem SelectedItem
         {
             get => _selectedItem;
             set
             {
-                if (SetProperty(ref _selectedItem, value))
-                {
-                    LoadItemDetails();
-                }
+                _selectedItem = value;
+                OnPropertyChanged();
+                UpdateCommandsState();
+            }
+        }
+
+        public Category SelectedCategory
+        {
+            get => _selectedCategory;
+            set
+            {
+                _selectedCategory = value;
+                OnPropertyChanged();
+                FilterItems();
             }
         }
 
@@ -30,10 +97,9 @@ namespace FactoryManager.Desktop.ViewModels
             get => _selectedLocation;
             set
             {
-                if (SetProperty(ref _selectedLocation, value))
-                {
-                    LoadLocationItems();
-                }
+                _selectedLocation = value;
+                OnPropertyChanged();
+                FilterItems();
             }
         }
 
@@ -42,239 +108,99 @@ namespace FactoryManager.Desktop.ViewModels
             get => _searchQuery;
             set
             {
-                if (SetProperty(ref _searchQuery, value))
-                {
-                    SearchCommand.Execute(null);
-                }
+                _searchQuery = value;
+                OnPropertyChanged();
+                FilterItems();
             }
         }
 
-        public bool IsLoading
+        public ICommand ReceiveItemsCommand { get; }
+        public ICommand IssueItemsCommand { get; }
+        public ICommand MoveItemCommand { get; }
+        public ICommand RefreshCommand { get; }
+
+        private async Task LoadDataAsync()
         {
-            get => _isLoading;
-            set => SetProperty(ref _isLoading, value);
-        }
-
-        public ObservableCollection<WarehouseItem> Items { get; } = new();
-        public ObservableCollection<Location> Locations { get; } = new();
-        public ObservableCollection<WarehouseTransaction> Transactions { get; } = new();
-        public ObservableCollection<StockAlert> StockAlerts { get; } = new();
-
-        public ICommand SearchCommand { get; }
-        public ICommand ReceiveCommand { get; }
-        public ICommand IssueCommand { get; }
-        public ICommand TransferCommand { get; }
-        public ICommand StockTakeCommand { get; }
-        public ICommand GenerateReportCommand { get; }
-
-        public WarehouseViewModel(IWarehouseService warehouseService)
-        {
-            _warehouseService = warehouseService;
-
-            SearchCommand = new RelayCommand(async _ => await SearchItems());
-            ReceiveCommand = new RelayCommand(async _ => await ReceiveItems());
-            IssueCommand = new RelayCommand(async _ => await IssueItems(), CanIssueItems);
-            TransferCommand = new RelayCommand(async _ => await TransferItems(), CanTransferItems);
-            StockTakeCommand = new RelayCommand(async _ => await StartStockTake());
-            GenerateReportCommand = new RelayCommand(async _ => await GenerateReport());
-
-            InitializeData();
-        }
-
-        private async void InitializeData()
-        {
-            await LoadLocations();
-            await LoadItems();
-            await LoadStockAlerts();
-        }
-
-        private async Task LoadLocations()
-        {
-            try
-            {
-                var locations = await _warehouseService.GetLocationsAsync();
-                Locations.Clear();
-                foreach (var location in locations)
-                {
-                    Locations.Add(location);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading locations: {ex.Message}");
-            }
-        }
-
-        private async Task LoadItems()
-        {
-            IsLoading = true;
             try
             {
                 var items = await _warehouseService.GetWarehouseItemsAsync();
-                Items.Clear();
-                foreach (var item in items)
-                {
-                    Items.Add(item);
-                }
+                WarehouseItems = new ObservableCollection<WarehouseItem>(items);
+
+                var categories = await _warehouseService.GetCategoriesAsync();
+                Categories = new ObservableCollection<Category>(categories);
+
+                var locations = await _warehouseService.GetLocationsAsync();
+                Locations = new ObservableCollection<Location>(locations);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading items: {ex.Message}");
-            }
-            finally
-            {
-                IsLoading = false;
+                await _dialogService.ShowErrorAsync("Error loading data", ex.Message);
             }
         }
 
-        private async Task LoadStockAlerts()
+        private async Task ReceiveItemsAsync()
         {
-            try
+            var dialog = new WarehouseTransactionDialog("Receive Items");
+            if (await _dialogService.ShowDialogAsync(dialog) == true)
             {
-                var alerts = await _warehouseService.GetStockAlertsAsync();
-                StockAlerts.Clear();
-                foreach (var alert in alerts)
+                try
                 {
-                    StockAlerts.Add(alert);
+                    await _warehouseService.ReceiveItemsAsync(dialog.ViewModel.Transaction);
+                    await LoadDataAsync();
                 }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading stock alerts: {ex.Message}");
+                catch (Exception ex)
+                {
+                    await _dialogService.ShowErrorAsync("Error receiving items", ex.Message);
+                }
             }
         }
 
-        private async void LoadItemDetails()
+        private async Task IssueItemsAsync()
         {
             if (SelectedItem == null) return;
 
-            try
+            var dialog = new WarehouseTransactionDialog("Issue Items");
+            if (await _dialogService.ShowDialogAsync(dialog) == true)
             {
-                var transactions = await _warehouseService.GetItemTransactionsAsync(SelectedItem.Id);
-                Transactions.Clear();
-                foreach (var transaction in transactions)
+                try
                 {
-                    Transactions.Add(transaction);
+                    await _warehouseService.IssueItemsAsync(dialog.ViewModel.Transaction);
+                    await LoadDataAsync();
+                }
+                catch (Exception ex)
+                {
+                    await _dialogService.ShowErrorAsync("Error issuing items", ex.Message);
                 }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading item details: {ex.Message}");
-            }
         }
 
-        private async void LoadLocationItems()
+        private async Task MoveItemAsync()
         {
-            if (SelectedLocation == null) return;
+            if (SelectedItem == null) return;
 
-            try
+            var dialog = new WarehouseTransactionDialog("Move Items");
+            if (await _dialogService.ShowDialogAsync(dialog) == true)
             {
-                var items = await _warehouseService.GetLocationItemsAsync(SelectedLocation.Id);
-                Items.Clear();
-                foreach (var item in items)
+                try
                 {
-                    Items.Add(item);
+                    await _warehouseService.MoveItemsAsync(dialog.ViewModel.Transaction);
+                    await LoadDataAsync();
+                }
+                catch (Exception ex)
+                {
+                    await _dialogService.ShowErrorAsync("Error moving items", ex.Message);
                 }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading location items: {ex.Message}");
-            }
         }
 
-        private async Task SearchItems()
+        private void FilterItems()
         {
-            if (string.IsNullOrWhiteSpace(SearchQuery)) return;
-
-            IsLoading = true;
-            try
-            {
-                var items = await _warehouseService.SearchItemsAsync(SearchQuery);
-                Items.Clear();
-                foreach (var item in items)
-                {
-                    Items.Add(item);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error searching items: {ex.Message}");
-            }
-            finally
-            {
-                IsLoading = false;
-            }
+            // Implement filtering logic based on category, location and search query
         }
 
-        private async Task ReceiveItems()
+        private void UpdateCommandsState()
         {
-            // Implementacja przyjęcia towaru
+            // Update commands' CanExecute state based on selected item
         }
-
-        private async Task IssueItems()
-        {
-            // Implementacja wydania towaru
-        }
-
-        private bool CanIssueItems(object parameter)
-        {
-            return SelectedItem != null && SelectedItem.Quantity > 0;
-        }
-
-        private async Task TransferItems()
-        {
-            // Implementacja przesunięcia międzymagazynowego
-        }
-
-        private bool CanTransferItems(object parameter)
-        {
-            return SelectedItem != null && SelectedLocation != null;
-        }
-
-        private async Task StartStockTake()
-        {
-            // Implementacja inwentaryzacji
-        }
-
-        private async Task GenerateReport()
-        {
-            // Implementacja generowania raportu
-        }
-    }
-
-    public class WarehouseItem
-    {
-        public int Id { get; set; }
-        public string Code { get; set; }
-        public string Name { get; set; }
-        public int Quantity { get; set; }
-        public string Location { get; set; }
-        public string Status { get; set; }
-    }
-
-    public class Location
-    {
-        public int Id { get; set; }
-        public string Code { get; set; }
-        public string Name { get; set; }
-        public string Type { get; set; }
-        public int Capacity { get; set; }
-    }
-
-    public class WarehouseTransaction
-    {
-        public DateTime Timestamp { get; set; }
-        public string Type { get; set; }
-        public int Quantity { get; set; }
-        public string Location { get; set; }
-        public string User { get; set; }
-    }
-
-    public class StockAlert
-    {
-        public string ItemCode { get; set; }
-        public string ItemName { get; set; }
-        public string AlertType { get; set; }
-        public string Message { get; set; }
     }
 }
