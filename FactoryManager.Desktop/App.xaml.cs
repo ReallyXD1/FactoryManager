@@ -1,16 +1,17 @@
-﻿using FactoryManager.Desktop.Services;
-using FactoryManager.Desktop.ViewModels;
-using FactoryManager.Desktop.Views;
+﻿using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
-using System.Net.Http;
-using System;
-using System.Windows;
+using Microsoft.Extensions.Configuration;
+using System.IO;
+using FactoryManager.Desktop.Services;
+using FactoryManager.Desktop.Services.Interfaces;
+using FactoryManager.Desktop.ViewModels;
+using System.Configuration;
 
 namespace FactoryManager.Desktop
 {
     public partial class App : Application
     {
-        private ServiceProvider _serviceProvider;
+        private IServiceProvider _serviceProvider;
 
         public App()
         {
@@ -21,47 +22,43 @@ namespace FactoryManager.Desktop
 
         private void ConfigureServices(IServiceCollection services)
         {
-            // Infrastructure
+            // Configuration
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false)
+            .Build();
+
+            services.AddSingleton<IConfiguration>(configuration);
+
+            // HTTP Client
             services.AddHttpClient();
-            services.AddSingleton<IHttpClient, HttpClientWrapper>();
-            services.AddSingleton<ISignalRClient, SignalRClient>();
 
             // Services
-            services.AddScoped<IAuthenticationService, AuthenticationService>();
-            services.AddScoped<IProductionService, ProductionService>();
-            services.AddScoped<IWarehouseService, WarehouseService>();
-            services.AddScoped<IPlanningService, PlanningService>();
-            services.AddScoped<IQualityService, QualityService>();
-            services.AddScoped<IReportService, ReportService>();
-            services.AddScoped<INotificationService, NotificationService>();
+            services.AddSingleton<IAuthenticationService, AuthenticationService>();
+            services.AddSingleton<IProductionService, ProductionService>();
+            services.AddSingleton<IWarehouseService, WarehouseService>();
+            services.AddSingleton<IQualityService, QualityService>();
+            services.AddSingleton<IReportService, ReportService>();
+            services.AddSingleton<INotificationService, NotificationService>();
+            services.AddSingleton<IDialogService, DialogService>();
 
             // ViewModels
-            services.AddScoped<LoginViewModel>();
-            services.AddScoped<MainViewModel>();
-            services.AddScoped<DashboardViewModel>();
-            services.AddScoped<ProductionViewModel>();
-            services.AddScoped<WarehouseViewModel>();
-            services.AddScoped<PlanningViewModel>();
-            services.AddScoped<QualityViewModel>();
-            services.AddScoped<ReportsViewModel>();
+            services.AddTransient<MainViewModel>();
+            services.AddTransient<ProductionViewModel>();
+            services.AddTransient<WarehouseViewModel>();
+            services.AddTransient<QualityViewModel>();
+            services.AddTransient<ReportsViewModel>();
 
-            // Views
-            services.AddTransient<MainWindow>();
-            services.AddTransient<LoginWindow>();
+            // Main Window
+            services.AddSingleton<MainWindow>();
         }
 
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
-            var loginWindow = _serviceProvider.GetRequiredService<LoginWindow>();
-            loginWindow.Show();
-        }
-
-        protected override void OnExit(ExitEventArgs e)
-        {
-            base.OnExit(e);
-            _serviceProvider.Dispose();
+            var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
+            mainWindow.Show();
         }
     }
 }
