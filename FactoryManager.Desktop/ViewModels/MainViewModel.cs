@@ -1,110 +1,135 @@
 ﻿using System;
+using System.Windows;
 using System.Windows.Input;
 using FactoryManager.Desktop.Commands;
-using FactoryManager.Desktop.Services;
+using FactoryManager.Desktop.Services.Interfaces;
+using FactoryManager.Desktop.Models;
 
 namespace FactoryManager.Desktop.ViewModels
 {
     public class MainViewModel : ViewModelBase
     {
         private readonly IAuthenticationService _authService;
+        private readonly IDialogService _dialogService;
         private readonly INotificationService _notificationService;
-        private ViewModelBase _currentView;
-        private string _userName;
-        private string _userRole;
+        private ViewModelBase _currentViewModel;
+        private string _statusMessage;
+        private User _currentUser;
 
         public MainViewModel(
             IAuthenticationService authService,
+            IDialogService dialogService,
             INotificationService notificationService,
-            DashboardViewModel dashboardViewModel,
             ProductionViewModel productionViewModel,
             WarehouseViewModel warehouseViewModel,
-            PlanningViewModel planningViewModel,
             QualityViewModel qualityViewModel,
             ReportsViewModel reportsViewModel)
         {
             _authService = authService;
+            _dialogService = dialogService;
             _notificationService = notificationService;
 
             NavigateCommand = new RelayCommand(Navigate);
+            ShowSettingsCommand = new RelayCommand(ShowSettings);
+            ShowAboutCommand = new RelayCommand(ShowAbout);
+            ExitCommand = new RelayCommand(Exit);
             LogoutCommand = new RelayCommand(Logout);
 
-            ViewModels = new Dictionary<string, ViewModelBase>
-            {
-                { "dashboard", dashboardViewModel },
-                { "production", productionViewModel },
-                { "warehouse", warehouseViewModel },
-                { "planning", planningViewModel },
-                { "quality", qualityViewModel },
-                { "reports", reportsViewModel }
-            };
+            ProductionViewModel = productionViewModel;
+            WarehouseViewModel = warehouseViewModel;
+            QualityViewModel = qualityViewModel;
+            ReportsViewModel = reportsViewModel;
 
-            CurrentView = dashboardViewModel;
-            LoadUserInfo();
-            InitializeNotifications();
+            CurrentViewModel = ProductionViewModel;
+            CurrentUser = _authService.GetCurrentUser();
+
+            _notificationService.OnNotificationReceived += HandleNotification;
         }
 
-        public ViewModelBase CurrentView
-        {
-            get => _currentView;
-            set
-            {
-                _currentView = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public string UserName
-        {
-            get => _userName;
-            set
-            {
-                _userName = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public string UserRole
-        {
-            get => _userRole;
-            set
-            {
-                _userRole = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public Dictionary<string, ViewModelBase> ViewModels { get; }
         public ICommand NavigateCommand { get; }
+        public ICommand ShowSettingsCommand { get; }
+        public ICommand ShowAboutCommand { get; }
+        public ICommand ExitCommand { get; }
         public ICommand LogoutCommand { get; }
+
+        public ViewModelBase CurrentViewModel
+        {
+            get => _currentViewModel;
+            set => SetProperty(ref _currentViewModel, value);
+        }
+
+        public string StatusMessage
+        {
+            get => _statusMessage;
+            set => SetProperty(ref _statusMessage, value);
+        }
+
+        public User CurrentUser
+        {
+            get => _currentUser;
+            private set => SetProperty(ref _currentUser, value);
+        }
+
+        public ProductionViewModel ProductionViewModel { get; }
+        public WarehouseViewModel WarehouseViewModel { get; }
+        public QualityViewModel QualityViewModel { get; }
+        public ReportsViewModel ReportsViewModel { get; }
 
         private void Navigate(object parameter)
         {
-            if (parameter is string viewName && ViewModels.ContainsKey(viewName))
+            if (!_authService.IsAuthenticated)
             {
-                CurrentView = ViewModels[viewName];
+                ShowLoginDialog();
+                return;
+            }
+
+            CurrentViewModel = parameter switch
+            {
+                "Production" => ProductionViewModel,
+                "Warehouse" => WarehouseViewModel,
+                "Quality" => QualityViewModel,
+                "Reports" => ReportsViewModel,
+                _ => CurrentViewModel
+            };
+        }
+
+        private async void ShowSettings(object parameter)
+        {
+            var dialog = new SettingsDialog();
+            await _dialogService.ShowDialogAsync(dialog);
+        }
+
+        private async void ShowAbout(object parameter)
+        {
+            var dialog = new AboutDialog();
+            await _dialogService.ShowDialogAsync(dialog);
+        }
+
+        private async void ShowLoginDialog()
+        {
+            var dialog = new LoginDialog();
+            var result = await _dialogService.ShowDialogAsync(dialog);
+            if (result == true)
+            {
+                CurrentUser = _authService.GetCurrentUser();
             }
         }
 
         private void Logout(object parameter)
         {
             _authService.Logout();
-            // Handle navigation to login window
+            CurrentUser = null;
+            CurrentViewModel = ProductionViewModel;
         }
 
-        private void LoadUserInfo()
+        private void Exit(object parameter)
         {
-            var user = _authService.GetCurrentUser();
-            UserName = user.Name;
-            UserRole = user.Role;
+            Application.Current.Shutdown();
         }
 
-        private void InitializeNotifications()
+        private void HandleNotification(object sender, Notification notification)
         {
-            _notificationService.OnNotificationReceived += (sender, notification) =>
-            {
-                // Handle notification display
-            };
+            StatusMessage = notification.Message;
         }
     }
 }

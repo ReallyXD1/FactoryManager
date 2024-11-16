@@ -1,7 +1,7 @@
-﻿<Window x:Class="FactoryManager.Desktop.Views.Dialogs.WarehouseTransactionDialog"
+﻿<Window x:Class="FactoryManager.Desktop.Views.Dialogs.ProductionOrderDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="{Binding DialogTitle}"
+        Title="New Production Order"
         Width="400" Height="500"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
@@ -13,21 +13,21 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="{Binding DialogTitle}"
+        <TextBlock Text="New Production Order"
                   Style="{StaticResource HeaderTextStyle}"/>
 
         <StackPanel Grid.Row="1" Margin="0,16">
-            <TextBlock Text="Item"
+            <TextBlock Text="Product"
                       Style="{StaticResource CaptionTextStyle}"/>
-            <ComboBox ItemsSource="{Binding WarehouseItems}"
-                      SelectedItem="{Binding SelectedItem}"
+            <ComboBox ItemsSource="{Binding Products}"
+                      SelectedItem="{Binding SelectedProduct}"
                       DisplayMemberPath="Name"
                       Margin="0,4,0,16"/>
 
-            <TextBlock Text="Location"
+            <TextBlock Text="Production Line"
                       Style="{StaticResource CaptionTextStyle}"/>
-            <ComboBox ItemsSource="{Binding Locations}"
-                      SelectedItem="{Binding SelectedLocation}"
+            <ComboBox ItemsSource="{Binding ProductionLines}"
+                      SelectedItem="{Binding SelectedProductionLine}"
                       DisplayMemberPath="Name"
                       Margin="0,4,0,16"/>
 
@@ -36,10 +36,16 @@
             <TextBox Text="{Binding Quantity}"
                      Margin="0,4,0,16"/>
 
-            <TextBlock Text="Reference Number"
+            <TextBlock Text="Priority"
                       Style="{StaticResource CaptionTextStyle}"/>
-            <TextBox Text="{Binding ReferenceNumber}"
-                     Margin="0,4,0,16"/>
+            <ComboBox ItemsSource="{Binding Priorities}"
+                      SelectedItem="{Binding SelectedPriority}"
+                      Margin="0,4,0,16"/>
+
+            <TextBlock Text="Start Date"
+                      Style="{StaticResource CaptionTextStyle}"/>
+            <DatePicker SelectedDate="{Binding StartDate}"
+                       Margin="0,4,0,16"/>
 
             <TextBlock Text="Notes"
                       Style="{StaticResource CaptionTextStyle}"/>
@@ -57,10 +63,10 @@
                     Command="{Binding CancelCommand}"
                     Style="{StaticResource OutlineButtonStyle}"
                     Margin="0,0,8,0"/>
-            <Button Content="Confirm"
-                    Command="{Binding ConfirmCommand}"
+            <Button Content="Create"
+                    Command="{Binding CreateCommand}"
                     Style="{StaticResource BaseButtonStyle}"
-                    IsEnabled="{Binding CanConfirm}"/>
+                    IsEnabled="{Binding CanCreate}"/>
         </StackPanel>
     </Grid>
 </Window>

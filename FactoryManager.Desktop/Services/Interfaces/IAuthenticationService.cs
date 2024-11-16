@@ -5,9 +5,14 @@ namespace FactoryManager.Desktop.Services.Interfaces
 {
     public interface IAuthenticationService
     {
+        bool IsAuthenticated { get; }
+        User GetCurrentUser();
         Task<bool> LoginAsync(string username, string password);
         void Logout();
-        User GetCurrentUser();
-        bool IsAuthenticated { get; }
+        Task<bool> ChangePasswordAsync(string currentPassword, string newPassword);
+        Task<bool> ValidateTokenAsync();
+        Task<bool> RefreshTokenAsync();
+        Task<UserSettings> GetUserSettingsAsync();
+        Task SaveUserSettingsAsync(UserSettings settings);
     }
 }

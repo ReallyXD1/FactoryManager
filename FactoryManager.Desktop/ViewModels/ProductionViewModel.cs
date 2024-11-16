@@ -4,8 +4,10 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using FactoryManager.Desktop.Commands;
 using FactoryManager.Desktop.Models;
-using FactoryManager.Desktop.Services;
+using FactoryManager.Desktop.Services.Interfaces;
 using FactoryManager.Desktop.Views.Dialogs;
+using LiveCharts;
+using LiveCharts.Wpf;
 
 namespace FactoryManager.Desktop.ViewModels
 {
@@ -13,202 +15,172 @@ namespace FactoryManager.Desktop.ViewModels
     {
         private readonly IProductionService _productionService;
         private readonly IDialogService _dialogService;
-        private ObservableCollection<ProductionOrder> _productionOrders;
-        private ObservableCollection<ProductionLine> _productionLines;
-        private ObservableCollection<string> _statuses;
+        private readonly INotificationService _notificationService;
         private ProductionOrder _selectedOrder;
-        private ProductionLine _selectedLine;
-        private string _selectedStatus;
-        private DateTime? _selectedDate;
+        private SeriesCollection _chartData;
+        private bool _isLoading;
 
         public ProductionViewModel(
             IProductionService productionService,
-            IDialogService dialogService)
+            IDialogService dialogService,
+            INotificationService notificationService)
         {
             _productionService = productionService;
             _dialogService = dialogService;
+            _notificationService = notificationService;
 
             ProductionOrders = new ObservableCollection<ProductionOrder>();
-            ProductionLines = new ObservableCollection<ProductionLine>();
-            Statuses = new ObservableCollection<string>();
+            ChartData = new SeriesCollection();
 
-            CreateOrderCommand = new AsyncRelayCommand(async _ => await CreateOrderAsync());
-            StartProductionCommand = new AsyncRelayCommand(async _ => await StartProductionAsync());
-            PauseProductionCommand = new AsyncRelayCommand(async _ => await PauseProductionAsync());
-            CompleteOrderCommand = new AsyncRelayCommand(async _ => await CompleteOrderAsync());
-            RefreshCommand = new AsyncRelayCommand(async _ => await LoadDataAsync());
+            NewOrderCommand = new AsyncRelayCommand(ShowNewOrderDialog);
+            RefreshCommand = new AsyncRelayCommand(LoadData);
+            StartProductionCommand = new AsyncRelayCommand(StartProduction, CanStartProduction);
+            PauseProductionCommand = new AsyncRelayCommand(PauseProduction, CanPauseProduction);
+            CompleteOrderCommand = new AsyncRelayCommand(CompleteOrder, CanCompleteOrder);
 
-            LoadDataAsync().ConfigureAwait(false);
+            LoadData(null);
         }
 
-        public ObservableCollection<ProductionOrder> ProductionOrders
-        {
-            get => _productionOrders;
-            set
-            {
-                _productionOrders = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public ObservableCollection<ProductionLine> ProductionLines
-        {
-            get => _productionLines;
-            set
-            {
-                _productionLines = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public ObservableCollection<string> Statuses
-        {
-            get => _statuses;
-            set
-            {
-                _statuses = value;
-                OnPropertyChanged();
-            }
-        }
+        public ObservableCollection<ProductionOrder> ProductionOrders { get; }
+        public ICommand NewOrderCommand { get; }
+        public ICommand RefreshCommand { get; }
+        public ICommand StartProductionCommand { get; }
+        public ICommand PauseProductionCommand { get; }
+        public ICommand CompleteOrderCommand { get; }
 
         public ProductionOrder SelectedOrder
         {
             get => _selectedOrder;
             set
             {
-                _selectedOrder = value;
-                OnPropertyChanged();
-                UpdateCommandsState();
+                if (SetProperty(ref _selectedOrder, value))
+                {
+                    ((AsyncRelayCommand)StartProductionCommand).RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)PauseProductionCommand).RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)CompleteOrderCommand).RaiseCanExecuteChanged();
+                }
             }
         }
 
-        public ProductionLine SelectedLine
+        public SeriesCollection ChartData
         {
-            get => _selectedLine;
-            set
-            {
-                _selectedLine = value;
-                OnPropertyChanged();
-                FilterOrders();
-            }
+            get => _chartData;
+            set => SetProperty(ref _chartData, value);
         }
 
-        public string SelectedStatus
+        public bool IsLoading
         {
-            get => _selectedStatus;
-            set
-            {
-                _selectedStatus = value;
-                OnPropertyChanged();
-                FilterOrders();
-            }
+            get => _isLoading;
+            set => SetProperty(ref _isLoading, value);
         }
 
-        public DateTime? SelectedDate
-        {
-            get => _selectedDate;
-            set
-            {
-                _selectedDate = value;
-                OnPropertyChanged();
-                FilterOrders();
-            }
-        }
-
-        public ICommand CreateOrderCommand { get; }
-        public ICommand StartProductionCommand { get; }
-        public ICommand PauseProductionCommand { get; }
-        public ICommand CompleteOrderCommand { get; }
-        public ICommand RefreshCommand { get; }
-
-        private async Task LoadDataAsync()
+        private async Task LoadData(object parameter)
         {
             try
             {
+                IsLoading = true;
                 var orders = await _productionService.GetProductionOrdersAsync();
-                ProductionOrders = new ObservableCollection<ProductionOrder>(orders);
+                ProductionOrders.Clear();
+                foreach (var order in orders)
+                {
+                    ProductionOrders.Add(order);
+                }
 
-                var lines = await _productionService.GetProductionLinesAsync();
-                ProductionLines = new ObservableCollection<ProductionLine>(lines);
-
-                Statuses = new ObservableCollection<string>(await _productionService.GetStatusesAsync());
+                var statistics = await _productionService.GetProductionStatisticsAsync();
+                UpdateChartData(statistics);
             }
             catch (Exception ex)
             {
-                await _dialogService.ShowErrorAsync("Error loading data", ex.Message);
+                await _dialogService.ShowErrorAsync("Error", "Failed to load production data.");
             }
-        }
-
-        private async Task CreateOrderAsync()
-        {
-            var dialog = new NewOrderDialog();
-            if (await _dialogService.ShowDialogAsync(dialog) == true)
+            finally
             {
-                try
-                {
-                    await _productionService.CreateOrderAsync(dialog.ViewModel.Order);
-                    await LoadDataAsync();
-                }
-                catch (Exception ex)
-                {
-                    await _dialogService.ShowErrorAsync("Error creating order", ex.Message);
-                }
+                IsLoading = false;
             }
         }
 
-        private async Task StartProductionAsync()
+        private async Task ShowNewOrderDialog(object parameter)
         {
-            if (SelectedOrder == null) return;
+            var dialog = new ProductionOrderDialog();
+            var result = await _dialogService.ShowDialogAsync(dialog);
+            if (result == true)
+            {
+                await LoadData(null);
+            }
+        }
 
+        private async Task StartProduction(object parameter)
+        {
             try
             {
                 await _productionService.StartProductionAsync(SelectedOrder.Id);
-                await LoadDataAsync();
+                await LoadData(null);
+                _notificationService.SendNotification(new Notification
+                {
+                    Message = $"Production started for order {SelectedOrder.Id}",
+                    Type = "Production"
+                });
             }
             catch (Exception ex)
             {
-                await _dialogService.ShowErrorAsync("Error starting production", ex.Message);
+                await _dialogService.ShowErrorAsync("Error", "Failed to start production.");
             }
         }
 
-        private async Task PauseProductionAsync()
+        private bool CanStartProduction(object parameter)
         {
-            if (SelectedOrder == null) return;
+            return SelectedOrder != null && SelectedOrder.Status == "Pending";
+        }
 
+        private async Task PauseProduction(object parameter)
+        {
             try
             {
                 await _productionService.PauseProductionAsync(SelectedOrder.Id);
-                await LoadDataAsync();
+                await LoadData(null);
             }
             catch (Exception ex)
             {
-                await _dialogService.ShowErrorAsync("Error pausing production", ex.Message);
+                await _dialogService.ShowErrorAsync("Error", "Failed to pause production.");
             }
         }
 
-        private async Task CompleteOrderAsync()
+        private bool CanPauseProduction(object parameter)
         {
-            if (SelectedOrder == null) return;
+            return SelectedOrder != null && SelectedOrder.Status == "InProgress";
+        }
 
+        private async Task CompleteOrder(object parameter)
+        {
             try
             {
                 await _productionService.CompleteOrderAsync(SelectedOrder.Id);
-                await LoadDataAsync();
+                await LoadData(null);
+                _notificationService.SendNotification(new Notification
+                {
+                    Message = $"Order {SelectedOrder.Id} completed",
+                    Type = "Production"
+                });
             }
             catch (Exception ex)
             {
-                await _dialogService.ShowErrorAsync("Error completing order", ex.Message);
+                await _dialogService.ShowErrorAsync("Error", "Failed to complete order.");
             }
         }
 
-        private void FilterOrders()
+        private bool CanCompleteOrder(object parameter)
         {
-            // Implement filtering logic based on selected line, status and date
+            return SelectedOrder != null && SelectedOrder.Status == "InProgress";
         }
 
-        private void UpdateCommandsState()
+        private void UpdateChartData(ProductionStatistics statistics)
         {
-            // Update commands' CanExecute state based on selected order
+            ChartData.Clear();
+            ChartData.Add(new LineSeries
+            {
+                Title = "Efficiency",
+                Values = new ChartValues<double>(statistics.ChartData.Select(x => x.Value))
+            });
         }
     }
 }
