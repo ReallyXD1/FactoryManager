@@ -1,162 +1,71 @@
 ﻿<UserControl x:Class="FactoryManager.Desktop.Views.QualityView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
+             mc:Ignorable="d">
 
-    <Grid Margin="20">
+    <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <Grid Grid.Row="0">
+        <TextBlock Text="Quality Control"
+                  Style="{StaticResource HeaderTextStyle}"/>
+
+        <StackPanel Grid.Row="1" 
+                    Orientation="Horizontal" 
+                    Margin="0,0,0,16">
+            <Button Content="New Control"
+                    Command="{Binding NewControlCommand}"
+                    Style="{StaticResource BaseButtonStyle}"
+                    Margin="0,0,8,0"/>
+            <Button Content="Report Issue"
+                    Command="{Binding ReportIssueCommand}"
+                    Style="{StaticResource AccentButtonStyle}"
+                    Margin="0,0,8,0"/>
+            <Button Content="Refresh"
+                    Command="{Binding RefreshCommand}"
+                    Style="{StaticResource OutlineButtonStyle}"/>
+        </StackPanel>
+
+        <DataGrid Grid.Row="2"
+                  Style="{StaticResource DefaultDataGridStyle}"
+                  ItemsSource="{Binding QualityControls}"
+                  SelectedItem="{Binding SelectedControl}">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="ID" Binding="{Binding Id}"/>
+                <DataGridTextColumn Header="Type" Binding="{Binding Type}"/>
+                <DataGridTextColumn Header="Order" Binding="{Binding ProductionOrderNumber}"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
+                <DataGridTextColumn Header="Inspector" Binding="{Binding Inspector}"/>
+                <DataGridTextColumn Header="Issues" Binding="{Binding NonConformities.Count}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid Grid.Row="3" Margin="0,16,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <TextBlock Text="Quality Control" 
-                      FontSize="24" 
-                      FontWeight="Bold"/>
+            <lvc:CartesianChart Series="{Binding QualityTrends}"
+                               Height="200"/>
 
             <StackPanel Grid.Column="1" 
-                        Orientation="Horizontal">
-                <Button Content="New Control" 
-                        Command="{Binding CreateControlCommand}"
-                        Style="{StaticResource PrimaryButton}"
-                        Margin="0,0,10,0"/>
-                <Button Content="Generate Report" 
-                        Command="{Binding GenerateReportCommand}"
-                        Style="{StaticResource PrimaryButton}"
-                        Margin="0,0,10,0"/>
-                <Button Content="Refresh" 
-                        Command="{Binding RefreshCommand}"
-                        Style="{StaticResource SecondaryButton}"/>
+                        Margin="16,0,0,0">
+                <TextBlock Text="Quality Metrics"
+                          Style="{StaticResource SubheaderTextStyle}"/>
+                <TextBlock Text="{Binding QualityRate, StringFormat='Quality Rate: {0:P1}'}"
+                          Style="{StaticResource BodyTextStyle}"/>
+                <TextBlock Text="{Binding OpenIssues, StringFormat='Open Issues: {0}'}"
+                          Style="{StaticResource BodyTextStyle}"
+                          Foreground="{StaticResource WarningBrush}"/>
             </StackPanel>
-        </Grid>
-
-        <!-- Filters -->
-        <Grid Grid.Row="1" Margin="0,20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="200"/>
-                <ColumnDefinition Width="200"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <ComboBox ItemsSource="{Binding ControlTypes}"
-                      SelectedItem="{Binding SelectedType}"
-                      Margin="0,0,10,0"/>
-
-            <ComboBox Grid.Column="1"
-                      ItemsSource="{Binding Statuses}"
-                      SelectedItem="{Binding SelectedStatus}"/>
-        </Grid>
-
-        <!-- Quality Controls Grid -->
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="300"/>
-            </Grid.ColumnDefinitions>
-
-            <DataGrid ItemsSource="{Binding Controls}"
-                      SelectedItem="{Binding SelectedControl}"
-                      AutoGenerateColumns="False"
-                      IsReadOnly="True"
-                      GridLinesVisibility="None"
-                      Background="White"
-                      BorderThickness="1"
-                      BorderBrush="#EEE">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Control No" 
-                                      Binding="{Binding ControlNumber}"
-                                      Width="120"/>
-                    <DataGridTextColumn Header="Type" 
-                                      Binding="{Binding Type}"
-                                      Width="150"/>
-                    <DataGridTextColumn Header="Date" 
-                                      Binding="{Binding Date, StringFormat=d}"
-                                      Width="120"/>
-                    <DataGridTextColumn Header="Status" 
-                                      Binding="{Binding Status}"
-                                      Width="100"/>
-                    <DataGridTextColumn Header="Result" 
-                                      Binding="{Binding Result}"
-                                      Width="100"/>
-                </DataGrid.Columns>
-            </DataGrid>
-
-            <!-- Control Details -->
-            <Border Grid.Column="1" 
-                    Margin="20,0,0,0" 
-                    Background="White"
-                    BorderThickness="1"
-                    BorderBrush="#EEE"
-                    Padding="15">
-                <StackPanel>
-                    <TextBlock Text="Control Details" 
-                             FontWeight="Bold" 
-                             FontSize="18"
-                             Margin="0,0,0,15"/>
-
-                    <StackPanel Orientation="Vertical" 
-                              Margin="0,0,0,20">
-                        <Button Content="Start Control" 
-                                Command="{Binding StartControlCommand}"
-                                Style="{StaticResource ActionButton}"
-                                Margin="0,0,0,5"/>
-                        <Button Content="Complete Control" 
-                                Command="{Binding CompleteControlCommand}"
-                                Style="{StaticResource ActionButton}"
-                                Margin="0,0,0,5"/>
-                        <Button Content="Report Non-Conformity" 
-                                Command="{Binding ReportNonConformityCommand}"
-                                Style="{StaticResource ActionButton}"/>
-                    </StackPanel>
-
-                    <TextBlock Text="Parameters:" 
-                             FontWeight="Bold"
-                             Margin="0,0,0,10"/>
-                    <ItemsControl ItemsSource="{Binding Parameters}"
-                                Margin="0,0,0,20">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Margin="0,0,0,5">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{Binding Name}"/>
-                                    <TextBlock Grid.Column="1" 
-                                             Text="{Binding Value}"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <TextBlock Text="Non-Conformities:" 
-                             FontWeight="Bold"
-                             Margin="0,0,0,10"/>
-                    <ItemsControl ItemsSource="{Binding NonConformities}"
-                                MaxHeight="200">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border BorderBrush="#EEE" 
-                                        BorderThickness="0,0,0,1"
-                                        Padding="0,5">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Number}" 
-                                                 FontWeight="Bold"/>
-                                        <TextBlock Text="{Binding Description}" 
-                                                 TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </Border>
         </Grid>
     </Grid>
 </UserControl>
