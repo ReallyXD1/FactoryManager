@@ -6,14 +6,14 @@ namespace FactoryManager.Desktop.Models.Auth
     public class SecurityPrincipal
     {
         public int Id { get; set; }
-        public string PrincipalType { get; set; }
-        public string Identifier { get; set; }
+        public string Name { get; set; }
+        public string Type { get; set; }
         public List<string> Roles { get; set; }
+        public Dictionary<string, object> Claims { get; set; }
+        public bool IsAuthenticated { get; set; }
+        public DateTime AuthenticatedAt { get; set; }
+        public string AuthenticationType { get; set; }
         public List<string> Permissions { get; set; }
         public Dictionary<string, object> Attributes { get; set; }
-        public bool IsActive { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public string TenantId { get; set; }
-        public Dictionary<string, string> Claims { get; set; }
     }
 }

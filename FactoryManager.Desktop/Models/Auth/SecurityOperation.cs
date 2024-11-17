@@ -6,14 +6,14 @@ namespace FactoryManager.Desktop.Models.Auth
     public class SecurityOperation
     {
         public int Id { get; set; }
-        public string OperationType { get; set; }
-        public string Target { get; set; }
+        public string Name { get; set; }
+        public string Type { get; set; }
         public Dictionary<string, object> Parameters { get; set; }
-        public DateTime ExecutedAt { get; set; }
-        public string ExecutedBy { get; set; }
+        public bool RequiresApproval { get; set; }
+        public int RiskLevel { get; set; }
+        public List<string> RequiredRoles { get; set; }
+        public DateTime ValidFrom { get; set; }
+        public DateTime? ValidTo { get; set; }
         public string Status { get; set; }
-        public TimeSpan Duration { get; set; }
-        public Dictionary<string, object> Result { get; set; }
-        public List<string> AffectedResources { get; set; }
     }
 }
