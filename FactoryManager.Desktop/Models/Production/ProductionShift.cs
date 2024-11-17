@@ -9,14 +9,11 @@ namespace FactoryManager.Desktop.Models.Production
         public string Name { get; set; }
         public TimeSpan StartTime { get; set; }
         public TimeSpan EndTime { get; set; }
-        public List<int> OperatorIds { get; set; }
-        public List<string> OperatorNames { get; set; }
-        public bool IsActive { get; set; }
+        public List<string> AssignedWorkers { get; set; }
         public string Supervisor { get; set; }
-        public int SupervisorId { get; set; }
-        public List<int> ProductionLineIds { get; set; }
-        public double TargetEfficiency { get; set; }
-        public Dictionary<string, object> ShiftParameters { get; set; }
-        public List<ShiftBreak> Breaks { get; set; }
+        public Dictionary<string, object> Targets { get; set; }
+        public bool IsActive { get; set; }
+        public List<string> ProductionLines { get; set; }
+        public string Status { get; set; }
     }
 }

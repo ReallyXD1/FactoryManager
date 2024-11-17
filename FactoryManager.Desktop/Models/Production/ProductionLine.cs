@@ -7,17 +7,13 @@ namespace FactoryManager.Desktop.Models.Production
     {
         public int Id { get; set; }
         public string Name { get; set; }
-        public string Description { get; set; }
-        public bool IsActive { get; set; }
         public string Status { get; set; }
-        public double Efficiency { get; set; }
-        public DateTime LastMaintenanceDate { get; set; }
-        public List<string> Capabilities { get; set; }
-        public int CurrentOrderId { get; set; }
-        public string CurrentOrderNumber { get; set; }
-        public int ShiftId { get; set; }
-        public string ShiftName { get; set; }
-        public Dictionary<string, double> Parameters { get; set; }
-        public MaintenanceSchedule MaintenanceSchedule { get; set; }
+        public int Capacity { get; set; }
+        public DateTime StartTime { get; set; }
+        public DateTime? EndTime { get; set; }
+        public List<string> AssignedWorkers { get; set; }
+        public Dictionary<string, object> Configuration { get; set; }
+        public string Supervisor { get; set; }
+        public bool IsActive { get; set; }
     }
 }

@@ -7,19 +7,13 @@ namespace FactoryManager.Desktop.Models.Production
     {
         public int Id { get; set; }
         public string OrderNumber { get; set; }
-        public string ProductName { get; set; }
-        public int ProductId { get; set; }
-        public int Quantity { get; set; }
-        public DateTime StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-        public string Status { get; set; }
-        public int ProductionLineId { get; set; }
-        public string ProductionLineName { get; set; }
-        public double Progress { get; set; }
+        public string ProductId { get; set; }
+        public int TargetQuantity { get; set; }
+        public DateTime DueDate { get; set; }
         public string Priority { get; set; }
-        public List<ProductionEvent> Events { get; set; }
-        public string Notes { get; set; }
-        public int AssignedOperatorId { get; set; }
-        public string AssignedOperatorName { get; set; }
+        public string Status { get; set; }
+        public List<string> AssignedBatches { get; set; }
+        public Dictionary<string, object> Requirements { get; set; }
+        public string CustomerReference { get; set; }
     }
 }
