@@ -1,21 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace FactoryManager.Desktop.Models
+namespace FactoryManager.Desktop.Models.Quality
 {
     public class QualityControl
     {
         public int Id { get; set; }
-        public string Type { get; set; }
-        public int ProductionOrderId { get; set; }
-        public string ProductionOrderNumber { get; set; }
+        public string ControlNumber { get; set; }
+        public DateTime InspectionDate { get; set; }
+        public int ProductId { get; set; }
+        public string ProductName { get; set; }
+        public int BatchNumber { get; set; }
+        public int InspectorId { get; set; }
+        public string InspectorName { get; set; }
         public string Status { get; set; }
-        public DateTime StartDate { get; set; }
-        public DateTime? CompletionDate { get; set; }
-        public string Inspector { get; set; }
-        public List<string> Parameters { get; set; }
-        public List<NonConformity> NonConformities { get; set; }
-        public string Notes { get; set; }
         public bool IsPassed { get; set; }
+        public List<QualityParameter> Parameters { get; set; }
+        public string Notes { get; set; }
+        public DateTime? ApprovedDate { get; set; }
+        public int? ApprovedById { get; set; }
+        public string ApprovedByName { get; set; }
+        public List<NonConformity> NonConformities { get; set; }
+        public byte[] AttachedDocuments { get; set; }
+        public Dictionary<string, string> CustomFields { get; set; }
     }
 }

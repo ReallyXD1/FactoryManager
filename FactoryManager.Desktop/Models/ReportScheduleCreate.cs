@@ -3,9 +3,8 @@ using System.Collections.Generic;
 
 namespace FactoryManager.Desktop.Models.Reports
 {
-    public class ReportSchedule
+    public class ReportScheduleCreate
     {
-        public int Id { get; set; }
         public int ReportId { get; set; }
         public string Frequency { get; set; }
         public DateTime StartDate { get; set; }
@@ -13,9 +12,9 @@ namespace FactoryManager.Desktop.Models.Reports
         public string RecurrencePattern { get; set; }
         public List<string> Recipients { get; set; }
         public Dictionary<string, object> Parameters { get; set; }
-        public bool IsActive { get; set; }
-        public DateTime LastRun { get; set; }
-        public DateTime NextRun { get; set; }
         public string OutputFormat { get; set; }
+        public bool SendEmpty { get; set; }
+        public string TimeZone { get; set; }
+        public Dictionary<string, string> DeliveryOptions { get; set; }
     }
 }

@@ -1,18 +1,23 @@
 ﻿using System;
+using System.Collections.Generic;
 
-namespace FactoryManager.Desktop.Models
+namespace FactoryManager.Desktop.Models.Quality
 {
     public class NonConformity
     {
         public int Id { get; set; }
-        public string Type { get; set; }
-        public string Severity { get; set; }
+        public int ControlId { get; set; }
         public string Description { get; set; }
-        public string CorrectiveAction { get; set; }
-        public DateTime ReportDate { get; set; }
-        public string ReportedBy { get; set; }
-        public bool IsResolved { get; set; }
-        public DateTime? ResolutionDate { get; set; }
+        public string Severity { get; set; }
+        public DateTime ReportedDate { get; set; }
+        public int ReportedById { get; set; }
+        public string ReportedByName { get; set; }
+        public string Status { get; set; }
         public string Resolution { get; set; }
+        public DateTime? ResolvedDate { get; set; }
+        public string Category { get; set; }
+        public List<string> AffectedParameters { get; set; }
+        public Dictionary<string, string> CorrectiveActions { get; set; }
+        public bool RequiresFollowUp { get; set; }
     }
 }

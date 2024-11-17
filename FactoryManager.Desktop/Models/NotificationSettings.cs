@@ -1,13 +1,18 @@
-﻿namespace FactoryManager.Desktop.Models
+﻿using System.Collections.Generic;
+
+namespace FactoryManager.Desktop.Models.Notifications
 {
     public class NotificationSettings
     {
-        public bool EnableDesktopNotifications { get; set; }
-        public bool EnableEmailNotifications { get; set; }
-        public bool EnableSound { get; set; }
-        public string SoundFile { get; set; }
-        public int DisplayDuration { get; set; }
-        public string Position { get; set; }
+        public bool EmailNotifications { get; set; }
+        public bool PushNotifications { get; set; }
+        public bool SoundEnabled { get; set; }
         public Dictionary<string, bool> NotificationTypes { get; set; }
+        public List<string> EmailAddresses { get; set; }
+        public string PreferredLanguage { get; set; }
+        public bool WorkHoursOnly { get; set; }
+        public Dictionary<string, string> Channels { get; set; }
+        public int RetentionDays { get; set; }
+        public Dictionary<string, string> AlertLevels { get; set; }
     }
 }
